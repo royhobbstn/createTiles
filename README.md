@@ -21,9 +21,11 @@ Running from an EC2 instance is highly recommended for performance reasons (and 
 
 Setting up ```~/.aws/credentials``` is probably the easiest option.
 
-**Create a bucket for your tiles**
+
+**Note:** *This script assumes your bucket has already been created.*
 
 Use an existing bucket or:
+
 ```
 aws s3 mb s3://bucket-name
 ```
@@ -38,9 +40,9 @@ cd createTiles
 
 
 **Running**
+
 ```bash geotiles_carto_2014-2016.sh yourbucketname county 2015```
 
-**Note:** *This script assumes your bucket has already been created.*
 
 
 ### How do I use this in a GL Map? ###
