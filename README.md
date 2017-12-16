@@ -6,7 +6,7 @@ Automate creation of Census [cartographic boundary file](https://www.census.gov/
 
 State, Place, County, Tract, Block Group
 
-***Supported Years***
+**Supported Years**
 
 2014, 2015, 2016
 
@@ -35,8 +35,8 @@ map.addLayer({
 });
 ```
 
-Where ```BUCKET`` is the name of the bucket you loaded the tiles into
+Where ```BUCKET``` is the name of the bucket you loaded the tiles into
 
-and ```GEO``` is one of: state, place, county, tract, bg
+and ```GEO``` is one of: ```state```, ```place```, ```county```, ```tract```, ```bg```
 
-and ``YEAR``` is one of: 2014, 2015, 2016.
+and ```YEAR``` is one of: 2014, 2015, 2016.
