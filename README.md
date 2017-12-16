@@ -15,18 +15,26 @@ State, Place, County, Tract, Block Group
 Running from an EC2 instance is highly recommended for performance reasons (and is the only environment I've tested in).  If you choose a different environment you'll probably also need to install ```ruby```, ```unzip```, and the [s3 command line](http://docs.aws.amazon.com/cli/latest/userguide/installing.html) tools.  
 
 
-**Before Starting***
+### Before Starting ###
 
-Download Repo
+**IMPORTANT:** [Configure AWS Credentials](http://docs.aws.amazon.com/cli/latest/userguide/cli-config-files.html)
+
+Setting up ```~/.aws/credentials``` is probably the easiest option.
+
+**Create a bucket for your tiles**
+
+Use an existing bucket or:
+```
+s3 mb yourbucketname
+```
+
+Then download the repository:
+
 ```
 sudo yum install git
 git clone https://github.com/royhobbstn/createTiles.git
 cd createTiles
 ```
-
-**IMPORTANT:** [Configure AWS Credentials](http://docs.aws.amazon.com/cli/latest/userguide/cli-config-files.html)
-
-Setting up ```~/.aws/credentials``` is probably the easiest option.
 
 
 **Running**
