@@ -25,7 +25,7 @@ Setting up ```~/.aws/credentials``` is probably the easiest option.
 
 Use an existing bucket or:
 ```
-s3 mb yourbucketname
+aws s3 mb s3://bucket-name
 ```
 
 Then download the repository:
