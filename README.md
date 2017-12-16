@@ -15,6 +15,26 @@ State, Place, County, Tract, Block Group
 Running from an EC2 instance is highly recommended for performance reasons (and is the only environment I've tested in).  If you choose a different environment you'll probably also need to install ```ruby```, ```unzip```, and the [s3 command line](http://docs.aws.amazon.com/cli/latest/userguide/installing.html) tools.  
 
 
+**Before Starting***
+
+Download Repo
+```
+sudo yum install git
+git clone https://github.com/royhobbstn/createTiles.git
+cd createTiles
+```
+
+**IMPORTANT:** [Configure AWS Credentials](http://docs.aws.amazon.com/cli/latest/userguide/cli-config-files.html)
+
+Setting up ```~/.aws/credentials``` is probably the easiest option.
+
+
+**Running**
+```bash geotiles_carto_2014-2016.sh yourbucketname county 2015```
+
+**Note:** *This script assumes your bucket has already been created.*
+
+
 ### How do I use this in a GL Map? ###
 
 ```
@@ -40,3 +60,10 @@ Where ```BUCKET``` is the name of the bucket you loaded the tiles into
 and ```GEO``` is one of: ```state```, ```place```, ```county```, ```tract```, ```bg```
 
 and ```YEAR``` is one of: 2014, 2015, 2016.
+
+**Note:**  *You'll most likely need to change the AWS Region* ```s3-us-west-2.amazonaws.com``` *to whichever region your bucket is in.*
+
+
+**ERRORS**
+
+If you can't get your tiles to show on your map, you're likely running into issues with bucket permissions, or CORS.
