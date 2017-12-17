@@ -55,7 +55,7 @@ then
     shp2json ./unzipped/cb_"$year"_us_"$geolayer"_500k.shp > ./geojson/cb_"$year"_us_"$geolayer"_500k.geojson
 
     # create county tiles
-    tippecanoe -e ./tiles/"$geolayer"_"$year" -l main -pC -z 10 -Z 4 -pf -pk -y GEOID ./geojson/cb_"$year"_us_"$geolayer"_500k.geojson
+    tippecanoe -e ./tiles/"$geolayer"_"$year" -l main -pC -z 12 -Z 4 -pf -pk -y GEOID ./geojson/cb_"$year"_us_"$geolayer"_500k.geojson
 
     # Upload directory to s3
     aws s3 sync ./tiles/"$geolayer"_"$year" s3://"$bucket"/"$geolayer"_"$year" --delete
