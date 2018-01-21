@@ -53,7 +53,7 @@ then
     shp2json ./unzipped/cb_"$year"_us_"$geolayer"_500k.shp > ./geojson/cb_"$year"_us_"$geolayer"_500k.geojson
 
     # create county or state tiles
-    tippecanoe -e ./tiles/"$geolayer"_"$year" -l main -pC -z 11 -Z 3 -pf -pk -y GEOID ./geojson/cb_"$year"_us_"$geolayer"_500k.geojson
+    tippecanoe -e ./tiles/"$geolayer"_"$year" -l main -pC -z 11 -Z 3 -pf -pk -y GEOID -y NAME ./geojson/cb_"$year"_us_"$geolayer"_500k.geojson
 fi
 
 if [ "$geolayer" == "place" ] || [ "$geolayer" == "tract" ] || [ "$geolayer" == "bg" ] ;
@@ -67,8 +67,8 @@ then
     done
 
     # create tiles. use * wildcard to automatically aggregate multiple geojson files
-    # tippecanoe -e ./tiles/"$geolayer"_"$year" -l main -pC -aN --maximum-tile-bytes=1024000 -z 11 -Z 3 -y GEOID ./geojson/*.geojson
-    tippecanoe -e ./tiles/"$geolayer"_"$year" -l main -pC -aL -D8 --maximum-tile-bytes=1024000 -z 11 -Z 3 -y GEOID ./geojson/*.geojson
+    tippecanoe -e ./tiles/"$geolayer"_"$year" -l main -pC -aN --maximum-tile-bytes=1524000 -z 11 -Z 3 -y GEOID -y NAME ./geojson/*.geojson
+    # tippecanoe -e ./tiles/"$geolayer"_"$year" -l main -pC -aL -D8 --maximum-tile-bytes=1524000 -z 11 -Z 3 -y GEOID -y NAME ./geojson/*.geojson
 fi
 
     # Upload directory to s3
