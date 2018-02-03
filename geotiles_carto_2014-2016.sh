@@ -65,7 +65,7 @@ then
 fi
 
     # Upload directory to s3
-    aws s3 sync ./tiles/"$geolayer"_"$year" s3://"$bucket"/"$geolayer"_"$year" --delete
+    aws s3 sync ./tiles/"$geolayer"_"$year" s3://"$bucket"/"$geolayer"_"$year" --content-encoding gzip --delete 
     
     echo "Done creating "$geolayer"_"$year" tileset."
 
