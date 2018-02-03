@@ -3,23 +3,9 @@
 
 # assumes named bucket has already been created
 
-# install linuxbrew
-ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Linuxbrew/install/master/install)" < /dev/null
-echo 'export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"' >>~/.bash_profile
-echo 'export MANPATH="/home/linuxbrew/.linuxbrew/share/man:$MANPATH"' >>~/.bash_profile
-echo 'export INFOPATH="/home/linuxbrew/.linuxbrew/share/info:$INFOPATH"' >>~/.bash_profile
-source ~/.bash_profile
-
 # install tippecanoe for creating tiles
 brew install tippecanoe
 brew upgrade tippecanoe
-
-# install nodejs and npm
-wget -qO- https://raw.githubusercontent.com/creationix/nvm/v0.33.2/install.sh | bash
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
-[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads
-nvm install node
 
 # install the npm shapefile package
 npm install -g shapefile
@@ -67,12 +53,15 @@ then
         shp2json ./unzipped/cb_"$year"_"$state"_"$geolayer"_500k.shp > ./geojson/cb_"$year"_"$state"_"$geolayer"_500k.geojson
     done
     
-    # TODO -y NAME for place
-
+    # include NAME field only for place geography
+    NM=""
+    if [ "$geolayer" == "place" ]
+    then
+    NM=" -y NAME "
+    fi
 
     # create tiles. use * wildcard to automatically aggregate multiple geojson files
-    tippecanoe -e ./tiles/"$geolayer"_"$year" -l main --no-tiny-polygon-reduction -D10 -d12 -aN -z9 -Z3 -y GEOID -M 250000 ./geojson/*.geojson
-
+    tippecanoe -e ./tiles/"$geolayer"_"$year" -l main --no-tiny-polygon-reduction -D10 -d12 -aN -z9 -Z3 -y GEOID `echo $NM` -M 250000 ./geojson/*.geojson
 fi
 
     # Upload directory to s3
@@ -81,7 +70,7 @@ fi
     echo "Done creating "$geolayer"_"$year" tileset."
 
     # create cluster metadata file
-    node create_clusters.js
+    node --max_old_space_size=8192 create_clusters.js
     
 
 # clean up

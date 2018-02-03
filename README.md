@@ -14,6 +14,25 @@ State, Place, County, Tract, Block Group
 
 Running from an Amazon Linux EC2 instance is highly recommended for performance reasons (and is the only environment I've tested in).  If you choose a different environment you'll probably also need to install ```ruby```, ```unzip```, and the [s3 command line](http://docs.aws.amazon.com/cli/latest/userguide/installing.html) tools.  
 
+This script requires linuxbrew or homebrew to run tippecanoe.  Here's how I installed linuxbrew:
+
+```
+ruby -e "$(curl -fsSL https://raw.githubusercontent.com/Linuxbrew/install/master/install)" < /dev/null
+echo 'export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"' >>~/.bash_profile
+echo 'export MANPATH="/home/linuxbrew/.linuxbrew/share/man:$MANPATH"' >>~/.bash_profile
+echo 'export INFOPATH="/home/linuxbrew/.linuxbrew/share/info:$INFOPATH"' >>~/.bash_profile
+source ~/.bash_profile
+```
+
+You'll also need to install nodeJS.  Here's my favorite way:
+
+```
+wget -qO- https://raw.githubusercontent.com/creationix/nvm/v0.33.2/install.sh | bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads
+nvm install node
+```
 
 ### Before Starting ###
 
@@ -36,6 +55,7 @@ Then download the repository:
 sudo yum install git
 git clone https://github.com/royhobbstn/createTiles.git
 cd createTiles
+npm install
 ```
 
 

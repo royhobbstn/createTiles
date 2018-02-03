@@ -68,7 +68,7 @@ fs.readdir('./geojson', (err, filenames) => {
             });
 
             // save output to s3
-            const myBucket = `geo-tilesets`;
+            const myBucket = `small-tiles`;
             const parsed_filename = filenames[0].split('_');
             const key = `clusters_${parsed_filename[1]}_${parsed_filename[3]}.json`;
 
