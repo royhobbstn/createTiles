@@ -24,7 +24,6 @@ fs.readdir('./geojson', (err, filenames) => {
             console.log(`counted ${count} features`);
 
             const point_array = feature_array.map(feature => {
-                // console.log(turf.centroid(feature.geometry, feature.properties));
                 return turf.centroid(feature.geometry, feature.properties);
             });
 
