@@ -5,6 +5,8 @@ const zlib = require('zlib');
 const AWS = require('aws-sdk');
 const s3 = new AWS.S3();
 
+const BUCKET = `small-tiles`;
+
 fs.readdir('./geojson', (err, filenames) => {
     if (err) {
         console.log(err);
@@ -67,7 +69,6 @@ fs.readdir('./geojson', (err, filenames) => {
             });
 
             // save output to s3
-            const myBucket = `small-tiles`;
             const parsed_filename = filenames[0].split('_');
             const key = `clusters_${parsed_filename[1]}_${parsed_filename[3]}.json`;
 
@@ -75,7 +76,7 @@ fs.readdir('./geojson', (err, filenames) => {
             zlib.gzip(JSON.stringify(cluster_obj), function(error, result) {
                 if (error) throw error;
 
-                const params = { Bucket: myBucket, Key: key, Body: result, ContentType: 'application/json', ContentEncoding: 'gzip' };
+                const params = { Bucket: BUCKET, Key: key, Body: result, ContentType: 'application/json', ContentEncoding: 'gzip' };
                 s3.putObject(params, function(err, data) {
                     if (err) {
                         console.log(err);

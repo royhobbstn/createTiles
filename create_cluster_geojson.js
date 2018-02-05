@@ -5,7 +5,7 @@ const AWS = require('aws-sdk');
 const rp = require('request-promise');
 
 const CLUSTER = 'c500';
-const CLUSTER_BUCKET = 'small-tiles';
+const BUCKET = 'small-tiles';
 
 // read file in the ./combined directory to get year and geo
 
@@ -21,23 +21,40 @@ fs.readdir('./combined', (err, filenames) => {
     // process files one at a time
     Promise.all([readGeoJSON(filenames[0]), readClusterFile(YEAR, GEO)])
         .then(data => {
-            console.log('done');
+
+            const geojson = data[0];
+            const cluster_lookup = data[1];
+
+            // add cluster information and remove other properties
+            const updated_features = geojson.features.map(feature => {
+                const geoid = feature.properties.GEOID;
+                const cluster = cluster_lookup[geoid];
+                const properties = { properties: { c: cluster } };
+                return Object.assign({}, feature, properties);
+            }).filter(feature => {
+                // filter out null geography
+                return feature.geometry;
+            });
+
+            // save feature collection
+            const clustered_geojson = { "type": "FeatureCollection", "features": updated_features };
+
+            fs.writeFile(`./cl_processed/${filenames[0]}`, JSON.stringify(clustered_geojson), 'utf8', function(err) {
+
+                if (err) {
+                    return console.log(err);
+                }
+                console.log(`saved at ./cl_processed/${filenames[0]}`);
+            });
+
+            // let mapshaper handle dissolve (turfjs dissolve is buggy)
+
         })
         .catch(err => {
             console.log(err);
         });
 
 });
-
-
-
-
-
-// TODO assign cluster to each feature
-
-// TODO dissolve on cluster
-
-// TODO save to directory
 
 
 // read combined GeoJSON file
@@ -50,10 +67,10 @@ function readGeoJSON(filename) {
                 console.log(err);
                 reject(err);
             }
-            const features = JSON.parse(data).features;
+            const collection = JSON.parse(data);
 
-            console.log(`${filename} had ${features.length} features.`);
-            resolve(features);
+            console.log(`${filename} had ${collection.features.length} features.`);
+            resolve(collection);
         });
     });
 }
@@ -64,7 +81,7 @@ function readClusterFile(year, geo) {
 
     return rp({
             method: 'get',
-            uri: `https://s3-us-west-2.amazonaws.com/${CLUSTER_BUCKET}/clusters_${year}_${geo}.json`,
+            uri: `https://s3-us-west-2.amazonaws.com/${BUCKET}/clusters_${year}_${geo}.json`,
             headers: {
                 'Accept-Encoding': 'gzip',
             },
