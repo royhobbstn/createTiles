@@ -1,11 +1,10 @@
-const turf = require('@turf/turf');
 const Promise = require('bluebird');
 const fs = require('fs');
 const AWS = require('aws-sdk');
 const rp = require('request-promise');
 
 const CLUSTER = 'c500';
-const BUCKET = 'small-tiles';
+const BUCKET = 'geography-tiles';
 
 // read file in the ./combined directory to get year and geo
 
