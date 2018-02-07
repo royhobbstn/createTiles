@@ -4,6 +4,7 @@ const fs = require('fs');
 const zlib = require('zlib');
 const AWS = require('aws-sdk');
 const s3 = new AWS.S3();
+const clustersKmeans = require('./modules/modKMeans.js');
 
 const BUCKET = `small-tiles`;
 
@@ -32,16 +33,16 @@ fs.readdir('./geojson', (err, filenames) => {
             var point_layer = turf.featureCollection(point_array);
 
             console.log('clustering @ 500');
-            const clustered_500 = turf.clustersKmeans(point_layer, { numberOfClusters: parseInt(count / 500, 10) || 1 });
+            const clustered_500 = clustersKmeans(point_layer, { numberOfClusters: parseInt(count / 500, 10) || 1 });
 
             console.log('clustering @ 2000');
-            const clustered_2000 = turf.clustersKmeans(point_layer, { numberOfClusters: parseInt(count / 2000, 10) || 1 });
+            const clustered_2000 = clustersKmeans(point_layer, { numberOfClusters: parseInt(count / 2000, 10) || 1 });
 
             console.log('clustering @ 5000');
-            const clustered_5000 = turf.clustersKmeans(point_layer, { numberOfClusters: parseInt(count / 5000, 10) || 1 });
+            const clustered_5000 = clustersKmeans(point_layer, { numberOfClusters: parseInt(count / 5000, 10) || 1 });
 
             console.log('clustering @ 10000');
-            const clustered_10000 = turf.clustersKmeans(point_layer, { numberOfClusters: parseInt(count / 10000, 10) || 1 });
+            const clustered_10000 = clustersKmeans(point_layer, { numberOfClusters: parseInt(count / 10000, 10) || 1 });
 
             console.log('done clustering');
 

@@ -21,6 +21,7 @@
     "aws-sdk": "^2.188.0",
     "bluebird": "^3.5.1",
     "request": "^2.83.0",
-    "request-promise": "^4.2.2"
+    "request-promise": "^4.2.2",
+    "skmeans": "^0.9.7"
   }
 }
