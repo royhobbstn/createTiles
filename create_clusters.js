@@ -6,7 +6,7 @@ const AWS = require('aws-sdk');
 const s3 = new AWS.S3();
 const clustersKmeans = require('./modules/modKMeans.js');
 
-const BUCKET = `small-tiles`;
+const BUCKET = `geography-tiles`;
 
 fs.readdir('./geojson', (err, filenames) => {
     if (err) {
@@ -32,42 +32,42 @@ fs.readdir('./geojson', (err, filenames) => {
 
             var point_layer = turf.featureCollection(point_array);
 
-            console.log('clustering @ 500');
-            const clustered_500 = clustersKmeans(point_layer, { numberOfClusters: parseInt(count / 500, 10) || 1 });
+            // console.log('clustering @ 500');
+            // const clustered_500 = clustersKmeans(point_layer, { numberOfClusters: parseInt(count / 500, 10) || 1 });
 
             console.log('clustering @ 2000');
             const clustered_2000 = clustersKmeans(point_layer, { numberOfClusters: parseInt(count / 2000, 10) || 1 });
 
-            console.log('clustering @ 5000');
-            const clustered_5000 = clustersKmeans(point_layer, { numberOfClusters: parseInt(count / 5000, 10) || 1 });
+            // console.log('clustering @ 5000');
+            // const clustered_5000 = clustersKmeans(point_layer, { numberOfClusters: parseInt(count / 5000, 10) || 1 });
 
-            console.log('clustering @ 10000');
-            const clustered_10000 = clustersKmeans(point_layer, { numberOfClusters: parseInt(count / 10000, 10) || 1 });
+            // console.log('clustering @ 10000');
+            // const clustered_10000 = clustersKmeans(point_layer, { numberOfClusters: parseInt(count / 10000, 10) || 1 });
 
             console.log('done clustering');
 
             const cluster_obj = {};
 
-            cluster_obj.c500 = {};
+            // cluster_obj.c500 = {};
             cluster_obj.c2000 = {};
-            cluster_obj.c5000 = {};
-            cluster_obj.c10000 = {};
+            // cluster_obj.c5000 = {};
+            // cluster_obj.c10000 = {};
 
-            clustered_500.features.forEach(feature => {
-                cluster_obj.c500[feature.properties.GEOID] = feature.properties.cluster;
-            });
+            // clustered_500.features.forEach(feature => {
+            //     cluster_obj.c500[feature.properties.GEOID] = feature.properties.cluster;
+            // });
 
             clustered_2000.features.forEach(feature => {
                 cluster_obj.c2000[feature.properties.GEOID] = feature.properties.cluster;
             });
 
-            clustered_5000.features.forEach(feature => {
-                cluster_obj.c5000[feature.properties.GEOID] = feature.properties.cluster;
-            });
+            // clustered_5000.features.forEach(feature => {
+            //     cluster_obj.c5000[feature.properties.GEOID] = feature.properties.cluster;
+            // });
 
-            clustered_10000.features.forEach(feature => {
-                cluster_obj.c10000[feature.properties.GEOID] = feature.properties.cluster;
-            });
+            // clustered_10000.features.forEach(feature => {
+            //     cluster_obj.c10000[feature.properties.GEOID] = feature.properties.cluster;
+            // });
 
             // save output to s3
             const parsed_filename = filenames[0].split('_');

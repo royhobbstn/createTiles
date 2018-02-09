@@ -3,7 +3,7 @@ const fs = require('fs');
 const AWS = require('aws-sdk');
 const rp = require('request-promise');
 
-const CLUSTER = 'c500';
+const CLUSTER = 'c2000';
 const BUCKET = 'geography-tiles';
 
 // read file in the ./combined directory to get year and geo
