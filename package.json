@@ -20,6 +20,7 @@
     "@turf/turf": "^5.1.6",
     "aws-sdk": "^2.188.0",
     "bluebird": "^3.5.1",
+    "random-points-on-polygon": "0.0.4",
     "request": "^2.83.0",
     "request-promise": "^4.2.2",
     "skmeans": "^0.9.7"
