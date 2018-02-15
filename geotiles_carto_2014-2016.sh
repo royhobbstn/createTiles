@@ -90,15 +90,11 @@ fi
     # dissolve on the cluster number
     mapshaper -i ./cl_processed/*.geojson -dissolve c -o ./cl_dissolved/cb_"$year"_"$geolayer"_cl.geojson
     
-    # save the geojson file to a bucket
-    aws s3 cp ./cl_dissolved/cb_"$year"_"$geolayer"_cl.geojson s3://"$bucket"/ --content-type 'application/json'
-
-    # gzip geojson
-    gzip ./cl_dissolved/cb_"$year"_"$geolayer"_cl.geojson
+    # tippecanoe the cluster_geojson
+    tippecanoe -e ./tiles/"$geolayer"_"$year"_cl -l main -z9 -Z3 ./cl_dissolved/*.geojson
     
-    # save the gzip file to a bucket
-    aws s3 cp ./cl_dissolved/cb_"$year"_"$geolayer"_cl.geojson.gz s3://"$bucket"/ --content-type 'application/json' --content-encoding 'gzip'
-
+    # save the cluster tiles to the bucket
+    aws s3 sync ./tiles/"$geolayer"_"$year"_cl s3://"$bucket"/"$geolayer"_"$year"_cl --content-encoding gzip --delete 
     
 # clean up
 rm -rf ./downloads ./geojson ./tiles ./unzipped ./simple ./combined ./cl_processed ./cl_dissolved ./cl_tiled
