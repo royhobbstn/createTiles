@@ -6,7 +6,16 @@ const AWS = require('aws-sdk');
 const s3 = new AWS.S3();
 const clustersKmeans = require('./modules/modKMeans.js');
 
-const BUCKET = `geography-tiles`;
+const BUCKET = process.argv[2];
+
+if(!BUCKET) {
+  console.log('missing BUCKET argument.');
+  console.log('please run like: node --max_old_space_size=8192 create_clusters.js $bucket');
+  process.exit();
+}
+
+console.log('Using bucket: ' + process.argv[2]);
+
 
 fs.readdir('./geojson', (err, filenames) => {
     if (err) {

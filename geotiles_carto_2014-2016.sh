@@ -71,7 +71,7 @@ fi
     echo "Done creating "$geolayer"_"$year" tileset."
 
     # create cluster metadata file
-    node --max_old_space_size=8192 create_clusters.js
+    node --max_old_space_size=8192 create_clusters.js $bucket
     
     # use mapshaper to make a drastically simplified version of the geojson
     for file in ./geojson/*.geojson
@@ -85,7 +85,7 @@ fi
     mapshaper -i ./simple/*.geojson combine-files -merge-layers -o ./combined/cb_"$year"_"$geolayer"_cl.geojson
     
     # convert geoids to cluster numbers in geojson
-    node --max_old_space_size=8192 create_cluster_geojson.js
+    node --max_old_space_size=8192 create_cluster_geojson.js $bucket
     
     # dissolve on the cluster number
     mapshaper -i ./cl_processed/*.geojson -dissolve c -o ./cl_dissolved/cb_"$year"_"$geolayer"_cl.geojson

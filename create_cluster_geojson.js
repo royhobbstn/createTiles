@@ -4,7 +4,17 @@ const AWS = require('aws-sdk');
 const rp = require('request-promise');
 
 const CLUSTER = 'c2000';
-const BUCKET = 'geography-tiles';
+
+const BUCKET = process.argv[2];
+
+if(!BUCKET) {
+  console.log('missing BUCKET argument.');
+  console.log('please run like: node --max_old_space_size=8192 create_cluster_geojson.js $bucket');
+  process.exit();
+}
+
+console.log('Using bucket: ' + process.argv[2]);
+
 
 // read file in the ./combined directory to get year and geo
 
