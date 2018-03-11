@@ -1,0 +1,30 @@
+{
+  "name": "aggregate-features",
+  "version": "0.0.1",
+  "description": "aggregate features when zoomed out",
+  "main": "aggregate.js",
+  "dependencies": {
+    "geojson-rbush": "^3.1.1",
+    "random-points-on-polygon": "^0.0.4",
+    "request": "^2.83.0",
+    "request-promise": "^4.2.2",
+    "skmeans": "^0.9.7"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/royhobbstn/createTiles.git"
+  },
+  "keywords": [
+    "aggregate"
+  ],
+  "author": "Daniel Trone",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/royhobbstn/createTiles/issues"
+  },
+  "homepage": "https://github.com/royhobbstn/createTiles#readme"
+}

@@ -61,7 +61,7 @@ then
     fi
 
     # create tiles. use * wildcard to automatically aggregate multiple geojson files
-    tippecanoe -e ./tiles/"$geolayer"_"$year" -l main --no-tiny-polygon-reduction -D10 -d12 -aN -z9 -Z3 -y GEOID `echo $NM` -M 250000 ./geojson/*.geojson
+    tippecanoe -e ./tiles/"$geolayer"_"$year" -l main -pt -D10 -d12 -aS -ab -z9 -Z3 -y GEOID `echo $NM` -M 250000 ./geojson/*.geojson
 fi
 
     # Upload directory to s3
