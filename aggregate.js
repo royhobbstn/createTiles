@@ -1,15 +1,25 @@
+// continually combine smaller features.  
+// without aggregating across state or county lines
+// note: this is beautiful
+
+
 const fs = require('fs');
 const turf = require('@turf/turf');
 const colorado = require('./test.json');
+
+const COMBINE = 3000;
+
+/*** Mutable Globals ***/
+
+let matches = [];
+const keyed_geojson = {};
+
+/*** Initial index creation and calculation ***/
 
 // spatially index shapes
 const geojsonRbush = require('geojson-rbush').default;
 const tree = geojsonRbush();
 tree.load(colorado);
-
-const matches = [];
-
-const keyed_geojson = {};
 
 const total_records = colorado.features.length;
 
@@ -17,10 +27,82 @@ const total_records = colorado.features.length;
 colorado.features.forEach((feature, index) => {
 
   if (index % 100 === 0) {
-    console.log('in progress ' + ((index / total_records) * 100).toFixed(2) + '%');
+    console.log('index progress (1/2) ' + ((index / total_records) * 100).toFixed(2) + '%');
   }
 
   keyed_geojson[feature.properties.GEOID] = feature;
+  computeFeature(feature);
+});
+
+
+/****** Do this is a loop ******/
+
+for (let i = 0; i < COMBINE; i++) {
+
+  if (i % 10 === 0) {
+    console.log('compute progress (2/2) ' + ((i / COMBINE) * 100).toFixed(2) + '%');
+  }
+
+  matches.sort((a, b) => {
+    return a.coalescability - b.coalescability;
+  });
+
+  const match = matches[1];
+
+  // we only use GEOID.  new geoid is just old geoids concatenated with _
+  const properties_a = keyed_geojson[match.features[0]].properties;
+  const properties_b = keyed_geojson[match.features[1]].properties;
+  const combined_geoid = properties_a.GEOID + '_' + properties_b.GEOID;
+
+  const combined = turf.union(keyed_geojson[match.features[0]], keyed_geojson[match.features[1]]);
+  // overwrite properties with new geoid
+  combined.properties = {
+    GEOID: combined_geoid
+  };
+
+  // create new combined feature
+  keyed_geojson[combined_geoid] = combined;
+
+  // delete old features that were combined
+  delete keyed_geojson[match.features[0]];
+  delete keyed_geojson[match.features[1]];
+
+  // go back through all features and recompute everything that was affected by the above transformation
+  matches = matches.filter(d => {
+    const match_a = d.features[0] === properties_a.GEOID;
+    const match_b = d.features[1] === properties_a.GEOID;
+    const match_c = d.features[0] === properties_b.GEOID;
+    const match_d = d.features[1] === properties_b.GEOID;
+    const match_any = (match_a || match_b || match_c || match_d);
+    return !match_any;
+  });
+
+  //update index (remove previous)
+  const options = tree.search(combined);
+  options.features.forEach(option => {
+    if (option.properties.GEOID === properties_a.GEOID || option.properties.GEOID === properties_b.GEOID) {
+      tree.remove(option);
+    }
+  });
+
+  // update index (add new)
+  tree.insert(combined);
+
+  // recompute features
+  computeFeature(combined);
+}
+
+// convert keyed geojson back to array
+const geojson_array = Object.keys(keyed_geojson).map(feature => {
+  return keyed_geojson[feature];
+});
+
+// save combined geojson to file
+fs.writeFileSync('./combined.json', JSON.stringify(turf.featureCollection(geojson_array)), 'utf8');
+
+
+
+function computeFeature(feature) {
 
   const geoid = feature.properties.GEOID;
   const area = turf.area(feature);
@@ -60,45 +142,4 @@ colorado.features.forEach((feature, index) => {
 
   });
 
-});
-
-
-matches.sort((a, b) => {
-  return a.coalescability - b.coalescability;
-});
-
-
-//console.log(JSON.stringify(matches.slice(0, 100)));
-
-matches.forEach(match => {
-  console.log(match);
-
-  // we only use GEOID.  new geoid is just old geoids concatenated with _
-  const properties_a = keyed_geojson[match.features[0]].properties;
-  const properties_b = keyed_geojson[match.features[1]].properties;
-  const combined_geoid = properties_a.GEOID + '_' + properties_b.GEOID;
-
-  const combined = turf.union(keyed_geojson[match.features[0]], keyed_geojson[match.features[1]]);
-  // overwrite properties with new geoid
-  combined.properties = {
-    GEOID: combined_geoid
-  };
-
-  // create new combined feature
-  keyed_geojson[combined_geoid] = combined;
-
-  // delete old features that were combined
-  delete keyed_geojson[match.features[0]];
-  delete keyed_geojson[match.features[1]];
-
-  // TODO go back through all features and recompute everything that was affected by the above transformation
-
-  process.exit();
-});
-
-
-// after aggregating, you can go back through and update each one after it is aggregated
-// rather than recalculating everything
-
-// but you're going to need to put the geojson into a temporary keyed lookup
-// else you'll be looping through the entire array repeatedly
+}
