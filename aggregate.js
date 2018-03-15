@@ -5,18 +5,36 @@
 
 const fs = require('fs');
 const turf = require('@turf/turf');
-const colorado = require('./test.json');
+const colorado = require('./bg.json');
 
-const COMBINE = 3000;
+// node aggregate.js bg 250 3
+// (filename, number_features, zoomlevel)
+
+console.log(`filename: ${process.argv[2]}`);
+console.log(`number of features: ${process.argv[3]}`);
+console.log(`zoomlevel: ${process.argv[4]}`);
+
+if (!process.argv[2] || !process.argv[3] || !process.argv[4]) {
+  console.log('missing arguments: (filename, number_features, zoomlevel');
+  console.log('run like: node aggregate.js bg.json 250 3');
+  process.exit();
+}
+
+const FILENAME = process.argv[2];
+const DESIRED_NUMBER_FEATURES = parseInt(process.argv[3], 10);
+const ZOOMLEVEL = process.argv[4];
+const FILE_ROOT = FILENAME.split('.')[0];
+
 
 /*** Mutable Globals ***/
 
 let matches = [];
 const keyed_geojson = {};
+let number_features_remaining;
+
 
 /*** Initial index creation and calculation ***/
 
-// spatially index shapes
 const geojsonRbush = require('geojson-rbush').default;
 const tree = geojsonRbush();
 tree.load(colorado);
@@ -30,17 +48,25 @@ colorado.features.forEach((feature, index) => {
     console.log('index progress (1/2) ' + ((index / total_records) * 100).toFixed(2) + '%');
   }
 
-  keyed_geojson[feature.properties.GEOID] = feature;
+  keyed_geojson[feature.properties.GEOID] = Object.assign({}, feature);
+
   computeFeature(feature);
 });
 
 
 /****** Do this is a loop ******/
 
-for (let i = 0; i < COMBINE; i++) {
+const starting_number_features = Object.keys(keyed_geojson).length;
+const reductions_needed = starting_number_features - DESIRED_NUMBER_FEATURES;
 
-  if (i % 10 === 0) {
-    console.log('compute progress (2/2) ' + ((i / COMBINE) * 100).toFixed(2) + '%');
+number_features_remaining = starting_number_features;
+
+while (number_features_remaining > DESIRED_NUMBER_FEATURES) {
+
+  let total_reductions = starting_number_features - number_features_remaining;
+
+  if (total_reductions % 10 === 0) {
+    console.log('compute progress (2/2) ' + ((total_reductions / reductions_needed) * 100).toFixed(2) + '%');
   }
 
   matches.sort((a, b) => {
@@ -90,6 +116,8 @@ for (let i = 0; i < COMBINE; i++) {
 
   // recompute features
   computeFeature(combined);
+
+  number_features_remaining = Object.keys(keyed_geojson).length;
 }
 
 // convert keyed geojson back to array
@@ -98,9 +126,10 @@ const geojson_array = Object.keys(keyed_geojson).map(feature => {
 });
 
 // save combined geojson to file
-fs.writeFileSync('./combined.json', JSON.stringify(turf.featureCollection(geojson_array)), 'utf8');
+fs.writeFileSync(`./${FILE_ROOT}_${ZOOMLEVEL}.json`, JSON.stringify(turf.featureCollection(geojson_array)), 'utf8');
 
 
+/*** Functions ***/
 
 function computeFeature(feature) {
 
