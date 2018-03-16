@@ -7,8 +7,9 @@
 brew install tippecanoe
 brew upgrade tippecanoe
 
-# install the npm shapefile package
+# install the npm shapefile and mapshaper packages
 npm install -g shapefile
+npm install -g mapshaper
 
 # array of unique state and territory fips codes
 declare -a state_fips=('01' '02' '04' '05' '06' '08' '09' '10' '11' '12' '13' '15' '16' '17' '18' '19' '20' '21' '22' '23' '24' '25' '26' '27' '28' '29' '30' '31' '32' '33' '34' '35' '36' '37' '38' '39' '40' '41' '42' '44' '45' '46' '47' '48' '49' '50' '51' '53' '54' '55' '56' '60' '66' '69' '72' '78');
@@ -40,7 +41,7 @@ then
     shp2json ./unzipped/cb_"$year"_us_"$geolayer"_500k.shp > ./geojson/cb_"$year"_us_"$geolayer"_500k.geojson
 
     # create county or state tiles
-    tippecanoe -e ./tiles/"$geolayer"_"$year" -l main --no-tiny-polygon-reduction -D10 -d12 -aN -z9 -Z3 -y GEOID -y NAME ./geojson/cb_"$year"_us_"$geolayer"_500k.geojson
+    tippecanoe -e ./tiles/"$geolayer"_"$year" -l main -pt -ab -z9 -Z3 -y GEOID -y NAME ./geojson/cb_"$year"_us_"$geolayer"_500k.geojson
 fi
 
 if [ "$geolayer" == "place" ] || [ "$geolayer" == "tract" ] || [ "$geolayer" == "bg" ] ;
@@ -59,9 +60,25 @@ then
     then
     NM=" -y NAME "
     fi
+    
+    mapshaper -i ./geojson/*.geojson combine-files -merge-layers -o "$geolayer".json 
+    node aggregate.js "$geolayer" 3
+    node aggregate.js "$geolayer" 4
+    node aggregate.js "$geolayer" 5
+    node aggregate.js "$geolayer" 6
+    node aggregate.js "$geolayer" 7
+    node aggregate.js "$geolayer" 8
+    tippecanoe -o ./"$geolayer"_3.mbtiles -l main -ab -pt -z3 -Z3 -y GEOID `echo $NM` -M 250000 "$geolayer"_3.json
+    tippecanoe -o ./"$geolayer"_4.mbtiles -l main -ab -pt -z4 -Z4 -y GEOID `echo $NM` -M 250000 "$geolayer"_4.json
+    tippecanoe -o ./"$geolayer"_5.mbtiles -l main -ab -pt -z5 -Z5 -y GEOID `echo $NM` -M 250000 "$geolayer"_5.json
+    tippecanoe -o ./"$geolayer"_6.mbtiles -l main -ab -pt -z6 -Z6 -y GEOID `echo $NM` -M 250000 "$geolayer"_6.json
+    tippecanoe -o ./"$geolayer"_7.mbtiles -l main -ab -pt -z7 -Z7 -y GEOID `echo $NM` -M 250000 "$geolayer"_7.json
+    tippecanoe -o ./"$geolayer"_8.mbtiles -l main -ab -pt -z8 -Z8 -y GEOID `echo $NM` -M 250000 "$geolayer"_8.json
+    tippecanoe -o ./"$geolayer"_9.mbtiles -l main -ab -pt -z9 -Z9 -y GEOID `echo $NM` -M 250000 "$geolayer".json
+    tile-join -e ./tiles/"$geolayer"_"$year" "$geolayer"_*.mbtiles
 
     # create tiles. use * wildcard to automatically aggregate multiple geojson files
-    tippecanoe -e ./tiles/"$geolayer"_"$year" -l main -pt -D10 -d12 -aS -ab -z9 -Z3 -y GEOID `echo $NM` -M 250000 ./geojson/*.geojson
+    # tippecanoe -e ./tiles/"$geolayer"_"$year" -l main -pt -D10 -d12 -aS -ab -z9 -Z3 -y GEOID `echo $NM` -M 250000 ./geojson/*.geojson
 fi
 
     # Upload directory to s3

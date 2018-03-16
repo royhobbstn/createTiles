@@ -5,25 +5,45 @@
 
 const fs = require('fs');
 const turf = require('@turf/turf');
-const colorado = require('./bg.json');
 
-// node aggregate.js bg 250 3
-// (filename, number_features, zoomlevel)
+// node aggregate.js bg 3
+// (geotype, zoomlevel)
 
-console.log(`filename: ${process.argv[2]}`);
-console.log(`number of features: ${process.argv[3]}`);
-console.log(`zoomlevel: ${process.argv[4]}`);
+console.log(`geotype: ${process.argv[2]}`);
+console.log(`zoomlevel: ${process.argv[3]}`);
 
-if (!process.argv[2] || !process.argv[3] || !process.argv[4]) {
-  console.log('missing arguments: (filename, number_features, zoomlevel');
-  console.log('run like: node aggregate.js bg.json 250 3');
+if (!process.argv[2] || !process.argv[3]) {
+  console.log('missing arguments: (geotype, zoomlevel');
+  console.log('run like: node aggregate.js bg 3');
   process.exit();
 }
 
-const FILENAME = process.argv[2];
-const DESIRED_NUMBER_FEATURES = parseInt(process.argv[3], 10);
-const ZOOMLEVEL = process.argv[4];
-const FILE_ROOT = FILENAME.split('.')[0];
+const GEOTYPE = process.argv[2];
+const ZOOMLEVEL = process.argv[3];
+
+const geojson_file = require(`./${GEOTYPE}.json`);
+
+const geojson_feature_count = geojson_file.features.length;
+
+console.log(geojson_feature_count);
+
+const zoom_features = {
+  '3': .07,
+  '4': .14,
+  '5': .21,
+  '6': .28,
+  '7': .42,
+  '8': .57
+};
+
+const pct_features_to_keep = zoom_features[ZOOMLEVEL];
+
+if (!pct_features_to_keep) {
+  console.log('not a valid zoomlevel.  use integers 3 to 8 only.');
+  process.exit();
+}
+
+const DESIRED_NUMBER_FEATURES = parseInt((geojson_feature_count * pct_features_to_keep), 10);
 
 
 /*** Mutable Globals ***/
@@ -37,18 +57,18 @@ let number_features_remaining;
 
 const geojsonRbush = require('geojson-rbush').default;
 const tree = geojsonRbush();
-tree.load(colorado);
+tree.load(geojson_file);
 
-const total_records = colorado.features.length;
+const total_records = geojson_file.features.length;
 
 // get area of each
-colorado.features.forEach((feature, index) => {
+geojson_file.features.forEach((feature, index) => {
 
   if (index % 100 === 0) {
     console.log('index progress (1/2) ' + ((index / total_records) * 100).toFixed(2) + '%');
   }
 
-  keyed_geojson[feature.properties.GEOID] = Object.assign({}, feature);
+  keyed_geojson[feature.properties.GEOID] = feature;
 
   computeFeature(feature);
 });
@@ -126,7 +146,7 @@ const geojson_array = Object.keys(keyed_geojson).map(feature => {
 });
 
 // save combined geojson to file
-fs.writeFileSync(`./${FILE_ROOT}_${ZOOMLEVEL}.json`, JSON.stringify(turf.featureCollection(geojson_array)), 'utf8');
+fs.writeFileSync(`./${GEOTYPE}_${ZOOMLEVEL}.json`, JSON.stringify(turf.featureCollection(geojson_array)), 'utf8');
 
 
 /*** Functions ***/
