@@ -110,7 +110,18 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
     const properties_b = keyed_geojson[match.features[1]].properties;
     const combined_geoid = properties_a.GEOID + '_' + properties_b.GEOID;
 
-    const combined = turf.union(keyed_geojson[match.features[0]], keyed_geojson[match.features[1]]);
+    let combined;
+
+    // temporary error check to see what types of polygons are causing problems in the union
+    try {
+      combined = turf.union(keyed_geojson[match.features[0]], keyed_geojson[match.features[1]]);
+    }
+    catch (e) {
+      console.log(e);
+      console.log(keyed_geojson[match.features[0]]);
+      console.log(keyed_geojson[match.features[1]]);
+    }
+
     // overwrite properties with new geoid
     combined.properties = {
       GEOID: combined_geoid
