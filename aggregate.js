@@ -21,7 +21,7 @@ if (!process.argv[2] || !process.argv[3]) {
 const GEOTYPE = process.argv[2];
 const ZOOMLEVEL = process.argv[3];
 
-const geojson_file = require(`./${GEOTYPE}.json`);
+const geojson_file = require(`./merged-geojson/${GEOTYPE}.json`);
 
 const geojson_feature_count = geojson_file.features.length;
 
@@ -146,7 +146,7 @@ const geojson_array = Object.keys(keyed_geojson).map(feature => {
 });
 
 // save combined geojson to file
-fs.writeFileSync(`./${GEOTYPE}_${ZOOMLEVEL}.json`, JSON.stringify(turf.featureCollection(geojson_array)), 'utf8');
+fs.writeFileSync(`./aggregated-geojson/${GEOTYPE}_${ZOOMLEVEL}.json`, JSON.stringify(turf.featureCollection(geojson_array)), 'utf8');
 
 
 /*** Functions ***/
@@ -159,16 +159,25 @@ function computeFeature(feature) {
   const nearby = tree.search(bbox);
 
   nearby.features.filter(d => {
-    // ignore self &&
-    // ignore geoids in different county
-
-    const county_a = d.properties.GEOID.slice(0, 5);
-    const county_b = feature.properties.GEOID.slice(0, 5);
-
-    const not_different_county = county_a === county_b;
+    // ignore self
     const not_self = d.properties.GEOID !== geoid;
 
-    return (not_self && not_different_county);
+    if (GEOTYPE === 'bg' || GEOTYPE === 'tract') {
+      // ignore geoids in different state/county
+      const county_a = d.properties.GEOID.slice(0, 5);
+      const county_b = feature.properties.GEOID.slice(0, 5);
+      const not_different_county = county_a === county_b;
+      return (not_self && not_different_county);
+    }
+    else {
+      // place
+      // ignore geoids in different state
+      const state_a = d.properties.GEOID.slice(0, 2);
+      const state_b = feature.properties.GEOID.slice(0, 2);
+      const not_different_state = state_a === state_b;
+      return (not_self && not_different_state);
+    }
+
 
   }).forEach(near_feature => {
     const intersection = turf.intersect(feature, near_feature);
