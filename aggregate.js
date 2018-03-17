@@ -21,7 +21,7 @@ if (!process.argv[2] || !process.argv[3]) {
 const GEOTYPE = process.argv[2];
 const ZOOMLEVEL = process.argv[3];
 
-const geojson_file = turf.unkinkPolygon(require(`./merged-geojson/${GEOTYPE}.json`));
+const geojson_file = require(`./merged-geojson/${GEOTYPE}.json`);
 
 const geojson_feature_count = geojson_file.features.length;
 
@@ -80,8 +80,9 @@ const starting_number_features = Object.keys(keyed_geojson).length;
 const reductions_needed = starting_number_features - DESIRED_NUMBER_FEATURES;
 
 number_features_remaining = starting_number_features;
+let can_still_simplify = true;
 
-while (number_features_remaining > DESIRED_NUMBER_FEATURES) {
+while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simplify) {
 
   let total_reductions = starting_number_features - number_features_remaining;
 
@@ -95,47 +96,58 @@ while (number_features_remaining > DESIRED_NUMBER_FEATURES) {
 
   const match = matches[1];
 
-  // we only use GEOID.  new geoid is just old geoids concatenated with _
-  const properties_a = keyed_geojson[match.features[0]].properties;
-  const properties_b = keyed_geojson[match.features[1]].properties;
-  const combined_geoid = properties_a.GEOID + '_' + properties_b.GEOID;
+  // are there still a pool of features remaining that can be simplified?
+  // sometimes constraints such as making sure features are not combined
+  // across county lines creates situations where we exhaust the pool of
+  // features able to be combined for low (zoomed out) zoom levels
+  if (!match) {
+    can_still_simplify = false;
+  }
+  else {
 
-  const combined = turf.union(keyed_geojson[match.features[0]], keyed_geojson[match.features[1]]);
-  // overwrite properties with new geoid
-  combined.properties = {
-    GEOID: combined_geoid
-  };
+    // we only use GEOID.  new geoid is just old geoids concatenated with _
+    const properties_a = keyed_geojson[match.features[0]].properties;
+    const properties_b = keyed_geojson[match.features[1]].properties;
+    const combined_geoid = properties_a.GEOID + '_' + properties_b.GEOID;
 
-  // create new combined feature
-  keyed_geojson[combined_geoid] = combined;
+    const combined = turf.union(keyed_geojson[match.features[0]], keyed_geojson[match.features[1]]);
+    // overwrite properties with new geoid
+    combined.properties = {
+      GEOID: combined_geoid
+    };
 
-  // delete old features that were combined
-  delete keyed_geojson[match.features[0]];
-  delete keyed_geojson[match.features[1]];
+    // create new combined feature
+    keyed_geojson[combined_geoid] = combined;
 
-  // go back through all features and recompute everything that was affected by the above transformation
-  matches = matches.filter(d => {
-    const match_a = d.features[0] === properties_a.GEOID;
-    const match_b = d.features[1] === properties_a.GEOID;
-    const match_c = d.features[0] === properties_b.GEOID;
-    const match_d = d.features[1] === properties_b.GEOID;
-    const match_any = (match_a || match_b || match_c || match_d);
-    return !match_any;
-  });
+    // delete old features that were combined
+    delete keyed_geojson[match.features[0]];
+    delete keyed_geojson[match.features[1]];
 
-  //update index (remove previous)
-  const options = tree.search(combined);
-  options.features.forEach(option => {
-    if (option.properties.GEOID === properties_a.GEOID || option.properties.GEOID === properties_b.GEOID) {
-      tree.remove(option);
-    }
-  });
+    // go back through all features and recompute everything that was affected by the above transformation
+    matches = matches.filter(d => {
+      const match_a = d.features[0] === properties_a.GEOID;
+      const match_b = d.features[1] === properties_a.GEOID;
+      const match_c = d.features[0] === properties_b.GEOID;
+      const match_d = d.features[1] === properties_b.GEOID;
+      const match_any = (match_a || match_b || match_c || match_d);
+      return !match_any;
+    });
 
-  // update index (add new)
-  tree.insert(combined);
+    //update index (remove previous)
+    const options = tree.search(combined);
+    options.features.forEach(option => {
+      if (option.properties.GEOID === properties_a.GEOID || option.properties.GEOID === properties_b.GEOID) {
+        tree.remove(option);
+      }
+    });
 
-  // recompute features
-  computeFeature(combined);
+    // update index (add new)
+    tree.insert(combined);
+
+    // recompute features
+    computeFeature(combined);
+
+  }
 
   number_features_remaining = Object.keys(keyed_geojson).length;
 }
