@@ -21,7 +21,7 @@ if (!process.argv[2] || !process.argv[3]) {
 const GEOTYPE = process.argv[2];
 const ZOOMLEVEL = process.argv[3];
 
-const geojson_file = require(`./merged-geojson/${GEOTYPE}.json`);
+const geojson_file = turf.unkinkPolygon(require(`./merged-geojson/${GEOTYPE}.json`));
 
 const geojson_feature_count = geojson_file.features.length;
 
