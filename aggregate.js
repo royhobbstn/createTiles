@@ -49,10 +49,13 @@ const DESIRED_NUMBER_FEATURES = parseInt((geojson_feature_count * pct_features_t
 
 /*** Mutable Globals ***/
 
-let matches = [];
+let matches = {};
+const ordered_match = [];
+let counter = 0;
 const keyed_geojson = {};
 let number_features_remaining;
 
+let building_index = true;
 
 /*** Initial index creation and calculation ***/
 
@@ -78,6 +81,14 @@ geojson_file.features.forEach((feature, index) => {
 
 /****** Do this is a loop ******/
 
+building_index = false;
+
+// sort all
+ordered_match.sort((a, b) => {
+  return Number(a.split('_')[0]) - Number(b.split('_')[0]);
+});
+
+
 const starting_number_features = Object.keys(keyed_geojson).length;
 const reductions_needed = starting_number_features - DESIRED_NUMBER_FEATURES;
 
@@ -86,12 +97,9 @@ let can_still_simplify = true;
 
 const initial = present();
 let total_sort = 0;
-let total_union = 0;
 let total_filter = 0;
-let total_tree_search = 0;
-let total_tree_remove = 0;
-let total_tree_insert = 0;
 let total_compute_features = 0;
+
 
 while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simplify) {
 
@@ -100,28 +108,25 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
   if (total_reductions % 10 === 0) {
     const current_time = present() - initial;
     console.log('compute progress (2/2) ' + ((total_reductions / reductions_needed) * 100).toFixed(2) + '%');
-    console.log(`matches.sort: ${total_sort / current_time}`);
-    console.log(`union: ${total_union / current_time}`);
     console.log(`filter: ${total_filter / current_time}`);
-    console.log(`tree search: ${total_tree_search / current_time}`);
-    console.log(`tree remove: ${total_tree_remove / current_time}`);
-    console.log(`tree insert: ${total_tree_insert / current_time}`);
     console.log(`compute features: ${total_compute_features / current_time}`);
     console.log('');
   }
 
-  // here
-
-
+  // error check this for nothing left in coalesced_scores array
   const m1 = present();
-  matches.sort((a, b) => {
-    return a.coalescability - b.coalescability;
-  });
+  let match;
+
+  if (ordered_match.length) {
+    const next_lowest = ordered_match.shift();
+    match = matches[next_lowest];
+  }
+  else {
+    match = false;
+  }
+
   const m2 = present();
   total_sort = total_sort + (m2 - m1);
-
-
-  const match = matches[0];
 
 
   // are there still a pool of features remaining that can be simplified?
@@ -134,15 +139,11 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
   else {
 
     // we only use GEOID.  new geoid is just old geoids concatenated with _
-    const properties_a = keyed_geojson[match.features[0]].properties;
-    const properties_b = keyed_geojson[match.features[1]].properties;
+    const properties_a = keyed_geojson[match[0]].properties;
+    const properties_b = keyed_geojson[match[1]].properties;
     const combined_geoid = properties_a.GEOID + '_' + properties_b.GEOID;
 
-    // here
-    const u1 = present();
-    const combined = turf.union(keyed_geojson[match.features[0]], keyed_geojson[match.features[1]]);
-    const u2 = present();
-    total_union = total_union + (u2 - u1);
+    const combined = turf.union(keyed_geojson[match[0]], keyed_geojson[match[1]]);
 
     // overwrite properties with new geoid
     combined.properties = {
@@ -153,53 +154,35 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
     keyed_geojson[combined_geoid] = combined;
 
     // delete old features that were combined
-    delete keyed_geojson[match.features[0]];
-    delete keyed_geojson[match.features[1]];
+    delete keyed_geojson[match[0]];
+    delete keyed_geojson[match[1]];
 
-    // here
     const f1 = present();
     // go back through all features and recompute everything that was affected by the above transformation
-    const new_matches = matches.filter(d => {
-      const match_a = d.features[0] === properties_a.GEOID;
-      const match_b = d.features[1] === properties_a.GEOID;
-      const match_c = d.features[0] === properties_b.GEOID;
-      const match_d = d.features[1] === properties_b.GEOID;
-      const match_any = (match_a || match_b || match_c || match_d);
-      if (match_any) {
-        console.log('removed');
+    Object.keys(matches).forEach(key => {
+      const geoid_array = matches[key];
+      const prop_a = properties_a.GEOID;
+      const prop_b = properties_b.GEOID;
+      if (geoid_array[0] === prop_a || geoid_array[0] === prop_b || geoid_array[1] === prop_a || geoid_array[1] === prop_b) {
+        delete matches[key];
+        removeElement(ordered_match, key);
       }
-      return !match_any;
     });
-    matches = new_matches;
-
     const f2 = present();
     total_filter = total_filter + (f2 - f1);
 
-    // here
     //update index (remove previous)
-    const ts1 = present();
     const options = tree.search(combined);
-    const ts2 = present();
-    total_tree_search = total_tree_search + (ts2 - ts1);
 
-    // here
-    const tr1 = present();
     options.features.forEach(option => {
       if (option.properties.GEOID === properties_a.GEOID || option.properties.GEOID === properties_b.GEOID) {
         tree.remove(option);
       }
     });
-    const tr2 = present();
-    total_tree_remove = total_tree_remove + (tr2 - tr1);
 
-    // here
     // update index (add new)
-    const ti1 = present();
     tree.insert(combined);
-    const ti2 = present();
-    total_tree_insert = total_tree_insert + (ti2 - ti1);
 
-    // here
     // recompute features
     const cf1 = present();
     computeFeature(combined);
@@ -256,23 +239,20 @@ function computeFeature(feature) {
       return (not_self && not_different_state);
     }
 
-
   });
 
-  // here
   nearby_filtered.forEach(near_feature => {
     let intersection;
     try {
       intersection = turf.intersect(feature, near_feature);
     }
     catch (e) {
-      console.log('intersect');
-      console.log(e);
-      console.log(intersection);
-      console.log('########');
-      console.log(JSON.stringify(feature));
-      console.log(',');
-      console.log(JSON.stringify(near_feature));
+      // console.log('intersect');
+      // console.log(e);
+      // console.log('########');
+      // console.log(JSON.stringify(feature));
+      // console.log(',');
+      // console.log(JSON.stringify(near_feature));
       intersection = null; // problems with turf.intersect on seemingly good geo
     }
     // potentially could be within bbox but not intersecting
@@ -284,13 +264,42 @@ function computeFeature(feature) {
       const inverse_shared_edge = 1 - (l1 / l2);
       const combined_area = area + matching_feature_area;
 
-      matches.push({
-        coalescability: inverse_shared_edge * combined_area,
-        features: [geoid, near_feature.properties.GEOID]
-      });
+      counter++;
+
+      const coalescability = String(inverse_shared_edge * combined_area) + `_${counter}`;
+
+      matches[coalescability] = [geoid, near_feature.properties.GEOID];
+
+      if (building_index) {
+        ordered_match.push(coalescability);
+      }
+      else {
+        inOrder(ordered_match, coalescability);
+      }
 
     }
 
   });
 
+}
+
+// https://stackoverflow.com/a/43427151/8896489
+function inOrder(arr, item) {
+  /* Insert item into arr keeping low to high order */
+
+  let ix = 0;
+  while (ix < arr.length) {
+    if (Number(item.split('_')[0]) < Number(arr[ix].split('_')[0])) { break; }
+    ix++;
+  }
+
+  arr.splice(ix, 0, item);
+}
+
+// https://stackoverflow.com/a/3774149/8896489
+function removeElement(array, item) {
+  var index = array.indexOf(item);
+  if (-1 !== index) {
+    array.splice(index, 1);
+  }
 }
