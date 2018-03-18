@@ -65,12 +65,12 @@ then
     mapshaper -i ./geojson/*.geojson combine-files -merge-layers -o ./merged-geojson/"$geolayer".json 
     
     # aggregate shapes when zoomed out.  aggregation level scales with zoom.
-    node --max_old_space_size=16384 aggregate.js "$geolayer" 3
-    node --max_old_space_size=16384 aggregate.js "$geolayer" 4
-    node --max_old_space_size=16384 aggregate.js "$geolayer" 5
-    node --max_old_space_size=16384 aggregate.js "$geolayer" 6
-    node --max_old_space_size=16384 aggregate.js "$geolayer" 7
-    node --max_old_space_size=16384 aggregate.js "$geolayer" 8
+    node --max_old_space_size=4096 aggregate.js "$geolayer" 3
+    node --max_old_space_size=4096 aggregate.js "$geolayer" 4
+    node --max_old_space_size=4096 aggregate.js "$geolayer" 5
+    node --max_old_space_size=4096 aggregate.js "$geolayer" 6
+    node --max_old_space_size=4096 aggregate.js "$geolayer" 7
+    node --max_old_space_size=4096 aggregate.js "$geolayer" 8
     # level 9 is full detail.  do not aggregate.
     
     # create tilesets for each individual zoomlevel

@@ -2,6 +2,7 @@
 // without aggregating across state or county lines
 // note: this is beautiful
 
+const present = require('present');
 
 const fs = require('fs');
 const turf = require('@turf/turf');
@@ -71,6 +72,7 @@ geojson_file.features.forEach((feature, index) => {
   keyed_geojson[feature.properties.GEOID] = feature;
 
   computeFeature(feature);
+
 });
 
 
@@ -82,19 +84,45 @@ const reductions_needed = starting_number_features - DESIRED_NUMBER_FEATURES;
 number_features_remaining = starting_number_features;
 let can_still_simplify = true;
 
+const initial = present();
+let total_sort = 0;
+let total_union = 0;
+let total_filter = 0;
+let total_tree_search = 0;
+let total_tree_remove = 0;
+let total_tree_insert = 0;
+let total_compute_features = 0;
+
 while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simplify) {
 
   let total_reductions = starting_number_features - number_features_remaining;
 
   if (total_reductions % 10 === 0) {
+    const current_time = present() - initial;
     console.log('compute progress (2/2) ' + ((total_reductions / reductions_needed) * 100).toFixed(2) + '%');
+    console.log(`matches.sort: ${total_sort / current_time}`);
+    console.log(`union: ${total_union / current_time}`);
+    console.log(`filter: ${total_filter / current_time}`);
+    console.log(`tree search: ${total_tree_search / current_time}`);
+    console.log(`tree remove: ${total_tree_remove / current_time}`);
+    console.log(`tree insert: ${total_tree_insert / current_time}`);
+    console.log(`compute features: ${total_compute_features / current_time}`);
+    console.log('');
   }
 
+  // here
+
+
+  const m1 = present();
   matches.sort((a, b) => {
     return a.coalescability - b.coalescability;
   });
+  const m2 = present();
+  total_sort = total_sort + (m2 - m1);
 
-  const match = matches[1];
+
+  const match = matches[0];
+
 
   // are there still a pool of features remaining that can be simplified?
   // sometimes constraints such as making sure features are not combined
@@ -110,17 +138,11 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
     const properties_b = keyed_geojson[match.features[1]].properties;
     const combined_geoid = properties_a.GEOID + '_' + properties_b.GEOID;
 
-    let combined;
-
-    // temporary error check to see what types of polygons are causing problems in the union
-    try {
-      combined = turf.union(keyed_geojson[match.features[0]], keyed_geojson[match.features[1]]);
-    }
-    catch (e) {
-      console.log(e);
-      console.log(keyed_geojson[match.features[0]]);
-      console.log(keyed_geojson[match.features[1]]);
-    }
+    // here
+    const u1 = present();
+    const combined = turf.union(keyed_geojson[match.features[0]], keyed_geojson[match.features[1]]);
+    const u2 = present();
+    total_union = total_union + (u2 - u1);
 
     // overwrite properties with new geoid
     combined.properties = {
@@ -134,29 +156,55 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
     delete keyed_geojson[match.features[0]];
     delete keyed_geojson[match.features[1]];
 
+    // here
+    const f1 = present();
     // go back through all features and recompute everything that was affected by the above transformation
-    matches = matches.filter(d => {
+    const new_matches = matches.filter(d => {
       const match_a = d.features[0] === properties_a.GEOID;
       const match_b = d.features[1] === properties_a.GEOID;
       const match_c = d.features[0] === properties_b.GEOID;
       const match_d = d.features[1] === properties_b.GEOID;
       const match_any = (match_a || match_b || match_c || match_d);
+      if (match_any) {
+        console.log('removed');
+      }
       return !match_any;
     });
+    matches = new_matches;
 
+    const f2 = present();
+    total_filter = total_filter + (f2 - f1);
+
+    // here
     //update index (remove previous)
+    const ts1 = present();
     const options = tree.search(combined);
+    const ts2 = present();
+    total_tree_search = total_tree_search + (ts2 - ts1);
+
+    // here
+    const tr1 = present();
     options.features.forEach(option => {
       if (option.properties.GEOID === properties_a.GEOID || option.properties.GEOID === properties_b.GEOID) {
         tree.remove(option);
       }
     });
+    const tr2 = present();
+    total_tree_remove = total_tree_remove + (tr2 - tr1);
 
+    // here
     // update index (add new)
+    const ti1 = present();
     tree.insert(combined);
+    const ti2 = present();
+    total_tree_insert = total_tree_insert + (ti2 - ti1);
 
+    // here
     // recompute features
+    const cf1 = present();
     computeFeature(combined);
+    const cf2 = present();
+    total_compute_features = total_compute_features + (cf2 - cf1);
 
   }
 
@@ -177,11 +225,18 @@ fs.writeFileSync(`./aggregated-geojson/${GEOTYPE}_${ZOOMLEVEL}.json`, JSON.strin
 function computeFeature(feature) {
 
   const geoid = feature.properties.GEOID;
+
+  // here
   const area = turf.area(feature);
+
+  // here
   const bbox = turf.bbox(feature);
+
+  // here
   const nearby = tree.search(bbox);
 
-  nearby.features.filter(d => {
+  // here
+  const nearby_filtered = nearby.features.filter(d => {
     // ignore self
     const not_self = d.properties.GEOID !== geoid;
 
@@ -202,9 +257,24 @@ function computeFeature(feature) {
     }
 
 
-  }).forEach(near_feature => {
-    const intersection = turf.intersect(feature, near_feature);
+  });
 
+  // here
+  nearby_filtered.forEach(near_feature => {
+    let intersection;
+    try {
+      intersection = turf.intersect(feature, near_feature);
+    }
+    catch (e) {
+      console.log('intersect');
+      console.log(e);
+      console.log(intersection);
+      console.log('########');
+      console.log(JSON.stringify(feature));
+      console.log(',');
+      console.log(JSON.stringify(near_feature));
+      intersection = null; // problems with turf.intersect on seemingly good geo
+    }
     // potentially could be within bbox but not intersecting
     if (intersection) {
       const l1 = turf.length(intersection, { units: 'kilometers' });
