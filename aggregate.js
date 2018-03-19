@@ -65,11 +65,13 @@ tree.load(geojson_file);
 
 const total_records = geojson_file.features.length;
 
-// get area of each
+
 geojson_file.features.forEach((feature, index) => {
 
   if (index % 100 === 0) {
     console.log('index progress (1/2) ' + ((index / total_records) * 100).toFixed(2) + '%');
+    console.log('potential pairs: ', ordered_match.length);
+
   }
 
   keyed_geojson[feature.properties.GEOID] = feature;
@@ -79,7 +81,7 @@ geojson_file.features.forEach((feature, index) => {
 });
 
 
-/****** Do this is a loop ******/
+/****** Do this is in a loop ******/
 
 building_index = false;
 
@@ -99,7 +101,9 @@ const initial = present();
 let total_sort = 0;
 let total_filter = 0;
 let total_compute_features = 0;
-
+let total_union = 0;
+let tree_operations = 0;
+let total_in_order = 0;
 
 while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simplify) {
 
@@ -110,6 +114,11 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
     console.log('compute progress (2/2) ' + ((total_reductions / reductions_needed) * 100).toFixed(2) + '%');
     console.log(`filter: ${total_filter / current_time}`);
     console.log(`compute features: ${total_compute_features / current_time}`);
+    console.log(`   - compute in_order: ${total_in_order / current_time}`);
+    console.log(`union: ${total_union / current_time}`);
+    console.log(`tree operations: ${tree_operations / current_time}`);
+    console.log('potential pairs: ', ordered_match.length);
+
     console.log('');
   }
 
@@ -143,7 +152,10 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
     const properties_b = keyed_geojson[match[1]].properties;
     const combined_geoid = properties_a.GEOID + '_' + properties_b.GEOID;
 
+    const tu1 = present();
     const combined = turf.union(keyed_geojson[match[0]], keyed_geojson[match[1]]);
+    const tu2 = present();
+    total_union = total_union + (tu2 - tu1);
 
     // overwrite properties with new geoid
     combined.properties = {
@@ -171,7 +183,8 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
     const f2 = present();
     total_filter = total_filter + (f2 - f1);
 
-    //update index (remove previous)
+    const ts1 = present();
+    // update index (remove previous)
     const options = tree.search(combined);
 
     options.features.forEach(option => {
@@ -182,6 +195,8 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
 
     // update index (add new)
     tree.insert(combined);
+    const ts2 = present();
+    tree_operations = tree_operations + (ts2 - ts1);
 
     // recompute features
     const cf1 = present();
@@ -208,9 +223,6 @@ fs.writeFileSync(`./aggregated-geojson/${GEOTYPE}_${ZOOMLEVEL}.json`, JSON.strin
 function computeFeature(feature) {
 
   const geoid = feature.properties.GEOID;
-
-  // here
-  const area = turf.area(feature);
 
   // here
   const bbox = turf.bbox(feature);
@@ -241,6 +253,12 @@ function computeFeature(feature) {
 
   });
 
+  const best_match = {
+    raw_coalescability: Infinity,
+    coalescability: '',
+    match: []
+  };
+
   nearby_filtered.forEach(near_feature => {
     let intersection;
     try {
@@ -259,6 +277,7 @@ function computeFeature(feature) {
     if (intersection) {
       const l1 = turf.length(intersection, { units: 'kilometers' });
       const l2 = turf.length(feature, { units: 'kilometers' });
+      const area = turf.area(feature);
       const matching_feature_area = turf.area(near_feature);
 
       const inverse_shared_edge = 1 - (l1 / l2);
@@ -266,20 +285,37 @@ function computeFeature(feature) {
 
       counter++;
 
-      const coalescability = String(inverse_shared_edge * combined_area) + `_${counter}`;
+      const raw_coalescability = inverse_shared_edge * combined_area;
+      const coalescability = String(raw_coalescability) + `_${counter}`;
 
-      matches[coalescability] = [geoid, near_feature.properties.GEOID];
+      // we only care about registering the best match; coalescibility will
+      // be recalculated as soon as a feature is joined to another,
+      // rendering lesser matches useless
+      if (raw_coalescability < best_match.raw_coalescability) {
+        best_match.raw_coalescability = raw_coalescability;
+        best_match.coalescability = coalescability;
+        best_match.match = [geoid, near_feature.properties.GEOID];
+      }
+    }
+  });
 
-      if (building_index) {
-        ordered_match.push(coalescability);
-      }
-      else {
-        inOrder(ordered_match, coalescability);
-      }
+
+  if (best_match.match.length) {
+    if (building_index) {
+      ordered_match.push(best_match.coalescability);
+    }
+    else {
+      const or1 = present();
+      inOrder(ordered_match, best_match.coalescability);
+      const or2 = present();
+      total_in_order = total_in_order + (or2 - or1);
 
     }
 
-  });
+    matches[best_match.coalescability] = best_match.match;
+  }
+
+
 
 }
 
