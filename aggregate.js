@@ -49,7 +49,8 @@ const DESIRED_NUMBER_FEATURES = parseInt((geojson_feature_count * pct_features_t
 
 /*** Mutable Globals ***/
 
-let matches = {};
+let new_matches = {};
+
 const ordered_match = [];
 let counter = 0;
 const keyed_geojson = {};
@@ -128,7 +129,18 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
 
   if (ordered_match.length) {
     const next_lowest = ordered_match.shift();
-    match = matches[next_lowest];
+    // match = matches[next_lowest];
+
+    // loop through all matches to find where match resides
+    Object.keys(new_matches).forEach(sub_matches => {
+      Object.keys(new_matches[sub_matches]).forEach(sm => {
+        if (sm === next_lowest) {
+          console.log('whoa hit');
+          match = new_matches[sub_matches][sm];
+        }
+      });
+    });
+
   }
   else {
     match = false;
@@ -150,6 +162,9 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
     // we only use GEOID.  new geoid is just old geoids concatenated with _
     const properties_a = keyed_geojson[match[0]].properties;
     const properties_b = keyed_geojson[match[1]].properties;
+    const prop_a = properties_a.GEOID;
+    const prop_b = properties_b.GEOID;
+    const geo_division = properties_a.GEOID.slice(0, 5);
     const combined_geoid = properties_a.GEOID + '_' + properties_b.GEOID;
 
     const tu1 = present();
@@ -171,12 +186,10 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
 
     const f1 = present();
     // go back through all features and recompute everything that was affected by the above transformation
-    Object.keys(matches).forEach(key => {
-      const geoid_array = matches[key];
-      const prop_a = properties_a.GEOID;
-      const prop_b = properties_b.GEOID;
+    Object.keys(new_matches[geo_division]).forEach(key => {
+      const geoid_array = new_matches[geo_division][key];
       if (geoid_array[0] === prop_a || geoid_array[0] === prop_b || geoid_array[1] === prop_a || geoid_array[1] === prop_b) {
-        delete matches[key];
+        delete new_matches[geo_division][key];
         removeElement(ordered_match, key);
       }
     });
@@ -256,7 +269,8 @@ function computeFeature(feature) {
   const best_match = {
     raw_coalescability: Infinity,
     coalescability: '',
-    match: []
+    match: [],
+    geo_division: ''
   };
 
   nearby_filtered.forEach(near_feature => {
@@ -282,6 +296,7 @@ function computeFeature(feature) {
 
       const inverse_shared_edge = 1 - (l1 / l2);
       const combined_area = area + matching_feature_area;
+      const geo_division = near_feature.properties.GEOID.slice(0, 5);
 
       counter++;
 
@@ -295,6 +310,7 @@ function computeFeature(feature) {
         best_match.raw_coalescability = raw_coalescability;
         best_match.coalescability = coalescability;
         best_match.match = [geoid, near_feature.properties.GEOID];
+        best_match.geo_division = geo_division;
       }
     }
   });
@@ -312,7 +328,10 @@ function computeFeature(feature) {
 
     }
 
-    matches[best_match.coalescability] = best_match.match;
+    if (!new_matches[best_match.geo_division]) {
+      new_matches[best_match.geo_division] = {};
+    }
+    new_matches[best_match.geo_division][best_match.coalescability] = best_match.match;
   }
 
 
