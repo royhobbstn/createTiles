@@ -22,6 +22,8 @@ if (!process.argv[2] || !process.argv[3]) {
 const GEOTYPE = process.argv[2];
 const ZOOMLEVEL = process.argv[3];
 
+const SLICE = getGeoidSlice(GEOTYPE);
+
 const geojson_file = require(`./merged-geojson/${GEOTYPE}.json`);
 
 const geojson_feature_count = geojson_file.features.length;
@@ -49,7 +51,7 @@ const DESIRED_NUMBER_FEATURES = parseInt((geojson_feature_count * pct_features_t
 
 /*** Mutable Globals ***/
 
-let new_matches = {};
+let matches = {};
 
 const ordered_match = [];
 let counter = 0;
@@ -129,14 +131,12 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
 
   if (ordered_match.length) {
     const next_lowest = ordered_match.shift();
-    // match = matches[next_lowest];
 
     // loop through all matches to find where match resides
-    Object.keys(new_matches).forEach(sub_matches => {
-      Object.keys(new_matches[sub_matches]).forEach(sm => {
+    Object.keys(matches).forEach(sub_matches => {
+      Object.keys(matches[sub_matches]).forEach(sm => {
         if (sm === next_lowest) {
-          console.log('whoa hit');
-          match = new_matches[sub_matches][sm];
+          match = matches[sub_matches][sm];
         }
       });
     });
@@ -164,7 +164,7 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
     const properties_b = keyed_geojson[match[1]].properties;
     const prop_a = properties_a.GEOID;
     const prop_b = properties_b.GEOID;
-    const geo_division = properties_a.GEOID.slice(0, 5);
+    const geo_division = properties_a.GEOID.slice(0, SLICE);
     const combined_geoid = properties_a.GEOID + '_' + properties_b.GEOID;
 
     const tu1 = present();
@@ -186,10 +186,10 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
 
     const f1 = present();
     // go back through all features and recompute everything that was affected by the above transformation
-    Object.keys(new_matches[geo_division]).forEach(key => {
-      const geoid_array = new_matches[geo_division][key];
+    Object.keys(matches[geo_division]).forEach(key => {
+      const geoid_array = matches[geo_division][key];
       if (geoid_array[0] === prop_a || geoid_array[0] === prop_b || geoid_array[1] === prop_a || geoid_array[1] === prop_b) {
-        delete new_matches[geo_division][key];
+        delete matches[geo_division][key];
         removeElement(ordered_match, key);
       }
     });
@@ -237,33 +237,18 @@ function computeFeature(feature) {
 
   const geoid = feature.properties.GEOID;
 
-  // here
   const bbox = turf.bbox(feature);
 
-  // here
   const nearby = tree.search(bbox);
 
-  // here
   const nearby_filtered = nearby.features.filter(d => {
     // ignore self
     const not_self = d.properties.GEOID !== geoid;
-
-    if (GEOTYPE === 'bg' || GEOTYPE === 'tract') {
-      // ignore geoids in different state/county
-      const county_a = d.properties.GEOID.slice(0, 5);
-      const county_b = feature.properties.GEOID.slice(0, 5);
-      const not_different_county = county_a === county_b;
-      return (not_self && not_different_county);
-    }
-    else {
-      // place
-      // ignore geoids in different state
-      const state_a = d.properties.GEOID.slice(0, 2);
-      const state_b = feature.properties.GEOID.slice(0, 2);
-      const not_different_state = state_a === state_b;
-      return (not_self && not_different_state);
-    }
-
+    // ignore geoids in different state/county/tract
+    const geo_slice_a = d.properties.GEOID.slice(0, SLICE);
+    const geo_slice_b = feature.properties.GEOID.slice(0, SLICE);
+    const not_different_geo = geo_slice_a === geo_slice_b;
+    return (not_self && not_different_geo);
   });
 
   const best_match = {
@@ -279,13 +264,10 @@ function computeFeature(feature) {
       intersection = turf.intersect(feature, near_feature);
     }
     catch (e) {
-      // console.log('intersect');
+      // problems with turf.intersect on seemingly good geo
       // console.log(e);
-      // console.log('########');
-      // console.log(JSON.stringify(feature));
-      // console.log(',');
-      // console.log(JSON.stringify(near_feature));
-      intersection = null; // problems with turf.intersect on seemingly good geo
+      // console.log(`${JSON.stringify(feature)},${JSON.stringify(near_feature)}`);
+      intersection = null;
     }
     // potentially could be within bbox but not intersecting
     if (intersection) {
@@ -296,7 +278,7 @@ function computeFeature(feature) {
 
       const inverse_shared_edge = 1 - (l1 / l2);
       const combined_area = area + matching_feature_area;
-      const geo_division = near_feature.properties.GEOID.slice(0, 5);
+      const geo_division = near_feature.properties.GEOID.slice(0, SLICE);
 
       counter++;
 
@@ -328,13 +310,11 @@ function computeFeature(feature) {
 
     }
 
-    if (!new_matches[best_match.geo_division]) {
-      new_matches[best_match.geo_division] = {};
+    if (!matches[best_match.geo_division]) {
+      matches[best_match.geo_division] = {};
     }
-    new_matches[best_match.geo_division][best_match.coalescability] = best_match.match;
+    matches[best_match.geo_division][best_match.coalescability] = best_match.match;
   }
-
-
 
 }
 
@@ -356,5 +336,21 @@ function removeElement(array, item) {
   var index = array.indexOf(item);
   if (-1 !== index) {
     array.splice(index, 1);
+  }
+}
+
+// get the next-up hierarchical geo level
+function getGeoidSlice(geo) {
+  if (geo === "bg") {
+    return 11;
+  }
+  else if (geo === "tract") {
+    return 5;
+  }
+  else if (geo === "place") {
+    return 2;
+  }
+  else {
+    console.log('unknown geo: ' + geo);
   }
 }
