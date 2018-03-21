@@ -54,6 +54,8 @@ const DESIRED_NUMBER_FEATURES = parseInt((geojson_feature_count * pct_features_t
 let matches = {};
 
 const ordered_match = [];
+const ordered_obj = {};
+
 let counter = 0;
 const keyed_geojson = {};
 let number_features_remaining;
@@ -74,7 +76,7 @@ geojson_file.features.forEach((feature, index) => {
   if (index % 100 === 0) {
     console.log('index progress (1/2) ' + ((index / total_records) * 100).toFixed(2) + '%');
     console.log('potential pairs: ', ordered_match.length);
-
+    console.log('');
   }
 
   keyed_geojson[feature.properties.GEOID] = feature;
@@ -91,6 +93,13 @@ building_index = false;
 // sort all
 ordered_match.sort((a, b) => {
   return Number(a.split('_')[0]) - Number(b.split('_')[0]);
+});
+
+// sort each array (one per key) in object
+Object.keys(ordered_obj).forEach(key => {
+  ordered_obj[key].sort((a, b) => {
+    return Number(a.split('_')[0]) - Number(b.split('_')[0]);
+  });
 });
 
 
@@ -128,6 +137,36 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
   // error check this for nothing left in coalesced_scores array
   const m1 = present();
   let match;
+  let a_match;
+
+  let lowest = { key: '', value: Infinity };
+
+  // loop through the array of sorted keys, find lowest
+  Object.keys(ordered_obj).forEach(key => {
+
+    // nothing left, early exit
+    if (!ordered_obj[key].length) {
+      return;
+    }
+    const value = Number(ordered_obj[key][0].split('_')[0]);
+    if (value < lowest.value) {
+      lowest.key = key;
+      lowest.value = value;
+    }
+  });
+
+  // lowest found, now grab it
+  const a_next_lowest = ordered_obj[lowest.key].shift();
+
+  // loop through all matches to find where match resides
+  Object.keys(matches).forEach(sub_matches => {
+    Object.keys(matches[sub_matches]).forEach(sm => {
+      if (sm === a_next_lowest) {
+        a_match = matches[sub_matches][sm];
+      }
+    });
+  });
+
 
   if (ordered_match.length) {
     const next_lowest = ordered_match.shift();
@@ -148,6 +187,9 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
 
   const m2 = present();
   total_sort = total_sort + (m2 - m1);
+
+  // TODO
+  match = a_match;
 
 
   // are there still a pool of features remaining that can be simplified?
@@ -191,6 +233,7 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
       if (geoid_array[0] === prop_a || geoid_array[0] === prop_b || geoid_array[1] === prop_a || geoid_array[1] === prop_b) {
         delete matches[geo_division][key];
         removeElement(ordered_match, key);
+        removeAnElement(ordered_obj[geo_division], key);
       }
     });
     const f2 = present();
@@ -301,10 +344,17 @@ function computeFeature(feature) {
   if (best_match.match.length) {
     if (building_index) {
       ordered_match.push(best_match.coalescability);
+
+      // TODO will I need this again below?
+      if (!ordered_obj[best_match.geo_division]) {
+        ordered_obj[best_match.geo_division] = [];
+      }
+      ordered_obj[best_match.geo_division].push(best_match.coalescability);
     }
     else {
       const or1 = present();
       inOrder(ordered_match, best_match.coalescability);
+      inOrder(ordered_obj[best_match.geo_division], best_match.coalescability);
       const or2 = present();
       total_in_order = total_in_order + (or2 - or1);
 
@@ -333,6 +383,13 @@ function inOrder(arr, item) {
 
 // https://stackoverflow.com/a/3774149/8896489
 function removeElement(array, item) {
+  var index = array.indexOf(item);
+  if (-1 !== index) {
+    array.splice(index, 1);
+  }
+}
+
+function removeAnElement(array, item) {
   var index = array.indexOf(item);
   if (-1 !== index) {
     array.splice(index, 1);
