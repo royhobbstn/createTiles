@@ -6,6 +6,7 @@ const present = require('present');
 
 const fs = require('fs');
 const turf = require('@turf/turf');
+const martinez = require('martinez-polygon-clipping');
 
 // node aggregate.js bg 3
 // (geotype, zoomlevel)
@@ -73,6 +74,7 @@ let total_trse = 0;
 let total_nf = 0;
 let total_bm = 0;
 let total_in_order = 0;
+let total_actual_intersect = 0;
 
 geojson_file.features.forEach((feature, index) => {
   if (index % 100 === 0) {
@@ -82,6 +84,7 @@ geojson_file.features.forEach((feature, index) => {
     console.log(`   - tree search: ${total_trse / index_time}`);
     console.log(`   - nearby filtered: ${total_nf / index_time}`);
     console.log(`   - intersection: ${total_bm / index_time}`);
+    console.log(`   -   actual inter: ${total_actual_intersect / index_time}`);
     console.log(`   - push to ordered array: ${total_in_order / index_time}`);
     console.log('');
   }
@@ -333,41 +336,42 @@ function computeFeature(feature) {
   };
 
   nearby_filtered.forEach(near_feature => {
-    try {
-      const intersection = turf.intersect(feature, near_feature);
 
-      // potentially could be within bbox but not intersecting
-      if (intersection) {
-        const l1 = turf.length(intersection, { units: 'kilometers' });
-        const l2 = turf.length(feature, { units: 'kilometers' });
-        const area = turf.area(feature);
-        const matching_feature_area = turf.area(near_feature);
+    const ai1 = present();
+    const line1 = turf.polygonToLine(feature);
+    const line2 = turf.polygonToLine(near_feature);
+    const intersection = turf.lineOverlap(line1, line2);
+    const ai2 = present();
+    total_actual_intersect = total_actual_intersect + (ai2 - ai1);
 
-        const inverse_shared_edge = 1 - (l1 / l2);
-        const combined_area = area + matching_feature_area;
-        const geo_division = near_feature.properties.GEOID.slice(0, SLICE);
+    // potentially could be within bbox but not intersecting
+    if (intersection) {
 
-        counter++;
+      const l1 = turf.length(intersection, { units: 'kilometers' });
+      const l2 = turf.length(feature, { units: 'kilometers' });
+      const area = turf.area(feature);
+      const matching_feature_area = turf.area(near_feature);
 
-        const raw_coalescability = inverse_shared_edge * combined_area;
-        const coalescability = String(raw_coalescability) + `_${counter}`;
+      const inverse_shared_edge = 1 - (l1 / l2);
+      const combined_area = area + matching_feature_area;
+      const geo_division = near_feature.properties.GEOID.slice(0, SLICE);
 
-        // we only care about registering the best match; coalescibility will
-        // be recalculated as soon as a feature is joined to another,
-        // rendering lesser matches useless
-        if (raw_coalescability < best_match.raw_coalescability) {
-          best_match.raw_coalescability = raw_coalescability;
-          best_match.coalescability = coalescability;
-          best_match.match = [feature.properties.GEOID, near_feature.properties.GEOID];
-          best_match.geo_division = geo_division;
-        }
+      counter++;
+
+      const raw_coalescability = inverse_shared_edge * combined_area;
+      const coalescability = String(raw_coalescability) + `_${counter}`;
+
+      // we only care about registering the best match; coalescibility will
+      // be recalculated as soon as a feature is joined to another,
+      // rendering lesser matches useless
+      if (raw_coalescability < best_match.raw_coalescability) {
+        best_match.raw_coalescability = raw_coalescability;
+        best_match.coalescability = coalescability;
+        best_match.match = [feature.properties.GEOID, near_feature.properties.GEOID];
+        best_match.geo_division = geo_division;
       }
     }
-    catch (e) {
-      // problems with turf.intersect on seemingly good geo
-      // console.log(e);
-      // console.log(`${JSON.stringify(feature)},${JSON.stringify(near_feature)}`);
-    }
+
   });
   const bm2 = present();
   total_bm = total_bm + (bm2 - bm1);
