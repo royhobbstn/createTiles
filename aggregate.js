@@ -67,9 +67,23 @@ const geojsonRbush = require('geojson-rbush').default;
 const tree = geojsonRbush();
 tree.load(geojson_file);
 
+const start_index_time = present();
+let total_bbox = 0;
+let total_trse = 0;
+let total_nf = 0;
+let total_bm = 0;
+let total_in_order = 0;
+
 geojson_file.features.forEach((feature, index) => {
   if (index % 100 === 0) {
+    const index_time = present() - start_index_time;
     console.log('index progress (1/2) ' + ((index / geojson_feature_count) * 100).toFixed(2) + '%');
+    console.log(`   - bbox calc: ${total_bbox / index_time}`);
+    console.log(`   - tree search: ${total_trse / index_time}`);
+    console.log(`   - nearby filtered: ${total_nf / index_time}`);
+    console.log(`   - intersection: ${total_bm / index_time}`);
+    console.log(`   - push to ordered array: ${total_in_order / index_time}`);
+    console.log('');
   }
 
   keyed_geojson[feature.properties.GEOID] = feature;
@@ -98,12 +112,17 @@ let total_filter = 0;
 let total_compute_features = 0;
 let total_union = 0;
 let tree_operations = 0;
-let total_in_order = 0;
 let total_find_lowest = 0;
 let total_find_match = 0;
 let total_start = 0;
 let add_remove = 0;
-let count_geojson = 0;
+
+total_in_order = 0;
+total_bbox = 0;
+total_trse = 0;
+total_nf = 0;
+total_bm = 0;
+
 
 /****** Do this is in a loop ******/
 
@@ -123,10 +142,14 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
     console.log(`union: ${total_union / current_time}`);
     console.log(`add_remove geojson: ${add_remove / current_time}`);
     console.log(`filter: ${total_filter / current_time}`);
-    console.log(`compute features: ${total_compute_features / current_time}`);
-    console.log(`   - compute in_order: ${total_in_order / current_time}`);
     console.log(`tree operations: ${tree_operations / current_time}`);
-    console.log(`count_geojson: ${count_geojson / current_time}`);
+
+    console.log(`compute features: ${total_compute_features / current_time}`);
+    console.log(`   - bbox calc: ${total_bbox / current_time}`);
+    console.log(`   - tree search: ${total_trse / current_time}`);
+    console.log(`   - nearby filtered: ${total_nf / current_time}`);
+    console.log(`   - intersection: ${total_bm / current_time}`);
+    console.log(`   - push to ordered array: ${total_in_order / current_time}`);
 
     console.log('');
   }
@@ -276,22 +299,32 @@ fs.writeFileSync(`./aggregated-geojson/${GEOTYPE}_${ZOOMLEVEL}.json`, JSON.strin
 
 function computeFeature(feature) {
 
-  const geoid = feature.properties.GEOID;
-
+  const bb1 = present();
   const bbox = turf.bbox(feature);
+  const bb2 = present();
+  total_bbox = total_bbox + (bb2 - bb1);
 
+  const trs1 = present();
   const nearby = tree.search(bbox);
+  const trs2 = present();
+  total_trse = total_trse + (trs2 - trs1);
 
+
+  const nf1 = present();
   const nearby_filtered = nearby.features.filter(d => {
     // ignore self
-    const not_self = d.properties.GEOID !== geoid;
+    const not_self = d.properties.GEOID !== feature.properties.GEOID;
     // ignore geoids in different state/county/tract
     const geo_slice_a = d.properties.GEOID.slice(0, SLICE);
     const geo_slice_b = feature.properties.GEOID.slice(0, SLICE);
     const not_different_geo = geo_slice_a === geo_slice_b;
     return (not_self && not_different_geo);
   });
+  const nf2 = present();
+  total_nf = total_nf + (nf2 - nf1);
 
+
+  const bm1 = present();
   const best_match = {
     raw_coalescability: Infinity,
     coalescability: '',
@@ -300,45 +333,47 @@ function computeFeature(feature) {
   };
 
   nearby_filtered.forEach(near_feature => {
-    let intersection;
     try {
-      intersection = turf.intersect(feature, near_feature);
+      const intersection = turf.intersect(feature, near_feature);
+
+      // potentially could be within bbox but not intersecting
+      if (intersection) {
+        const l1 = turf.length(intersection, { units: 'kilometers' });
+        const l2 = turf.length(feature, { units: 'kilometers' });
+        const area = turf.area(feature);
+        const matching_feature_area = turf.area(near_feature);
+
+        const inverse_shared_edge = 1 - (l1 / l2);
+        const combined_area = area + matching_feature_area;
+        const geo_division = near_feature.properties.GEOID.slice(0, SLICE);
+
+        counter++;
+
+        const raw_coalescability = inverse_shared_edge * combined_area;
+        const coalescability = String(raw_coalescability) + `_${counter}`;
+
+        // we only care about registering the best match; coalescibility will
+        // be recalculated as soon as a feature is joined to another,
+        // rendering lesser matches useless
+        if (raw_coalescability < best_match.raw_coalescability) {
+          best_match.raw_coalescability = raw_coalescability;
+          best_match.coalescability = coalescability;
+          best_match.match = [feature.properties.GEOID, near_feature.properties.GEOID];
+          best_match.geo_division = geo_division;
+        }
+      }
     }
     catch (e) {
       // problems with turf.intersect on seemingly good geo
       // console.log(e);
       // console.log(`${JSON.stringify(feature)},${JSON.stringify(near_feature)}`);
-      intersection = null;
-    }
-    // potentially could be within bbox but not intersecting
-    if (intersection) {
-      const l1 = turf.length(intersection, { units: 'kilometers' });
-      const l2 = turf.length(feature, { units: 'kilometers' });
-      const area = turf.area(feature);
-      const matching_feature_area = turf.area(near_feature);
-
-      const inverse_shared_edge = 1 - (l1 / l2);
-      const combined_area = area + matching_feature_area;
-      const geo_division = near_feature.properties.GEOID.slice(0, SLICE);
-
-      counter++;
-
-      const raw_coalescability = inverse_shared_edge * combined_area;
-      const coalescability = String(raw_coalescability) + `_${counter}`;
-
-      // we only care about registering the best match; coalescibility will
-      // be recalculated as soon as a feature is joined to another,
-      // rendering lesser matches useless
-      if (raw_coalescability < best_match.raw_coalescability) {
-        best_match.raw_coalescability = raw_coalescability;
-        best_match.coalescability = coalescability;
-        best_match.match = [geoid, near_feature.properties.GEOID];
-        best_match.geo_division = geo_division;
-      }
     }
   });
+  const bm2 = present();
+  total_bm = total_bm + (bm2 - bm1);
 
 
+  const or1 = present();
   if (best_match.match.length) {
     if (building_index) {
       if (!ordered_obj[best_match.geo_division]) {
@@ -347,11 +382,7 @@ function computeFeature(feature) {
       ordered_obj[best_match.geo_division].push(best_match.coalescability);
     }
     else {
-      const or1 = present();
       inOrder(ordered_obj[best_match.geo_division], best_match.coalescability);
-      const or2 = present();
-      total_in_order = total_in_order + (or2 - or1);
-
     }
 
     if (!matches[best_match.geo_division]) {
@@ -359,6 +390,8 @@ function computeFeature(feature) {
     }
     matches[best_match.geo_division][best_match.coalescability] = best_match.match;
   }
+  const or2 = present();
+  total_in_order = total_in_order + (or2 - or1);
 
 }
 
