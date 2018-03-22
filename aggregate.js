@@ -26,7 +26,8 @@ const SLICE = getGeoidSlice(GEOTYPE);
 
 const geojson_file = require(`./merged-geojson/${GEOTYPE}.json`);
 
-const geojson_feature_count = geojson_file.features.length;
+const STARTING_GEOJSON_FEATURE_COUNT = geojson_file.features.length;
+let geojson_feature_count = STARTING_GEOJSON_FEATURE_COUNT;
 
 console.log(geojson_feature_count);
 
@@ -47,7 +48,7 @@ if (!pct_features_to_keep) {
 }
 
 const DESIRED_NUMBER_FEATURES = parseInt((geojson_feature_count * pct_features_to_keep), 10);
-
+const REDUCTIONS_NEEDED = STARTING_GEOJSON_FEATURE_COUNT - DESIRED_NUMBER_FEATURES;
 
 /*** Mutable Globals ***/
 
@@ -57,7 +58,6 @@ const ordered_obj = {};
 
 let counter = 0;
 const keyed_geojson = {};
-let number_features_remaining;
 
 let building_index = true;
 
@@ -67,11 +67,9 @@ const geojsonRbush = require('geojson-rbush').default;
 const tree = geojsonRbush();
 tree.load(geojson_file);
 
-const total_records = geojson_file.features.length;
-
 geojson_file.features.forEach((feature, index) => {
   if (index % 100 === 0) {
-    console.log('index progress (1/2) ' + ((index / total_records) * 100).toFixed(2) + '%');
+    console.log('index progress (1/2) ' + ((index / geojson_feature_count) * 100).toFixed(2) + '%');
   }
 
   keyed_geojson[feature.properties.GEOID] = feature;
@@ -79,7 +77,7 @@ geojson_file.features.forEach((feature, index) => {
 });
 
 
-/****** Do this is in a loop ******/
+/****** Setup ******/
 
 building_index = false;
 
@@ -91,10 +89,7 @@ Object.keys(ordered_obj).forEach(key => {
 });
 
 
-const starting_number_features = Object.keys(keyed_geojson).length;
-const reductions_needed = starting_number_features - DESIRED_NUMBER_FEATURES;
 
-number_features_remaining = starting_number_features;
 let can_still_simplify = true;
 
 const initial = present();
@@ -104,22 +99,40 @@ let total_compute_features = 0;
 let total_union = 0;
 let tree_operations = 0;
 let total_in_order = 0;
+let total_find_lowest = 0;
+let total_find_match = 0;
+let total_start = 0;
+let add_remove = 0;
+let count_geojson = 0;
 
-while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simplify) {
+/****** Do this is in a loop ******/
 
-  let total_reductions = starting_number_features - number_features_remaining;
+while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) {
 
-  if (total_reductions % 10 === 0) {
+  const ii1 = present();
+
+  if (geojson_feature_count % 10 === 0) {
     const current_time = present() - initial;
-    console.log('compute progress (2/2) ' + ((total_reductions / reductions_needed) * 100).toFixed(2) + '%');
+    const progress = ((STARTING_GEOJSON_FEATURE_COUNT - geojson_feature_count) / REDUCTIONS_NEEDED) * 100;
+    console.log('compute progress (2/2) ' + progress.toFixed(2) + '%');
+    console.log(`start / console: ${total_start / current_time}`);
+    console.log(`lowest: ${total_sort / current_time}`);
+    console.log(` - find lowest: ${total_find_lowest / current_time}`);
+    console.log(` - find match: ${total_find_match / current_time}`);
+
+    console.log(`union: ${total_union / current_time}`);
+    console.log(`add_remove geojson: ${add_remove / current_time}`);
     console.log(`filter: ${total_filter / current_time}`);
     console.log(`compute features: ${total_compute_features / current_time}`);
     console.log(`   - compute in_order: ${total_in_order / current_time}`);
-    console.log(`union: ${total_union / current_time}`);
     console.log(`tree operations: ${tree_operations / current_time}`);
+    console.log(`count_geojson: ${count_geojson / current_time}`);
 
     console.log('');
   }
+
+  const ii2 = present();
+  total_start = total_start + (ii2 - ii1);
 
   // error check this for nothing left in coalesced_scores array
   const m1 = present();
@@ -128,6 +141,7 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
 
   let lowest = { key: '', value: Infinity };
 
+  const fl1 = present();
   // loop through the array of sorted keys, find lowest
   Object.keys(ordered_obj).forEach(key => {
 
@@ -141,12 +155,16 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
       lowest.value = value;
     }
   });
+  const fl2 = present();
+  total_find_lowest = total_find_lowest + (fl2 - fl1);
 
   if (!lowest.key) {
     // exhausted all features eligible for combining
     a_match = false;
   }
   else {
+
+    const fm1 = present();
     // lowest found, now grab it
     const a_next_lowest = ordered_obj[lowest.key].shift();
 
@@ -158,7 +176,11 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
         }
       });
     });
+
+    const fm2 = present();
+    total_find_match = total_find_match + (fm2 - fm1);
   }
+
 
   const m2 = present();
   total_sort = total_sort + (m2 - m1);
@@ -172,6 +194,7 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
     can_still_simplify = false;
   }
   else {
+    const tu1 = present();
 
     // we only use GEOID.  new geoid is just old geoids concatenated with _
     const properties_a = keyed_geojson[a_match[0]].properties;
@@ -181,11 +204,11 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
     const geo_division = properties_a.GEOID.slice(0, SLICE);
     const combined_geoid = properties_a.GEOID + '_' + properties_b.GEOID;
 
-    const tu1 = present();
     const combined = turf.union(keyed_geojson[a_match[0]], keyed_geojson[a_match[1]]);
     const tu2 = present();
     total_union = total_union + (tu2 - tu1);
 
+    const add1 = present();
     // overwrite properties with new geoid
     combined.properties = {
       GEOID: combined_geoid
@@ -197,6 +220,11 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
     // delete old features that were combined
     delete keyed_geojson[a_match[0]];
     delete keyed_geojson[a_match[1]];
+
+    geojson_feature_count--;
+
+    const add2 = present();
+    add_remove = add_remove + (add2 - add1);
 
     const f1 = present();
     // go back through all features and recompute everything that was affected by the above transformation
@@ -233,7 +261,6 @@ while ((number_features_remaining > DESIRED_NUMBER_FEATURES) && can_still_simpli
 
   }
 
-  number_features_remaining = Object.keys(keyed_geojson).length;
 }
 
 // convert keyed geojson back to array
