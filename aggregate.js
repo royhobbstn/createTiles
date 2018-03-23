@@ -6,7 +6,6 @@ const present = require('present');
 
 const fs = require('fs');
 const turf = require('@turf/turf');
-const martinez = require('martinez-polygon-clipping');
 
 // node aggregate.js bg 3
 // (geotype, zoomlevel)
@@ -119,6 +118,7 @@ let total_find_lowest = 0;
 let total_find_match = 0;
 let total_start = 0;
 let add_remove = 0;
+let total_convert = 0;
 
 total_in_order = 0;
 total_bbox = 0;
@@ -140,6 +140,7 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
     console.log(`start / console: ${total_start / current_time}`);
     console.log(`lowest: ${total_sort / current_time}`);
     console.log(` - find lowest: ${total_find_lowest / current_time}`);
+    console.log(`   - convert: ${total_convert / current_time}`);
     console.log(` - find match: ${total_find_match / current_time}`);
 
     console.log(`union: ${total_union / current_time}`);
@@ -168,14 +169,21 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
   let lowest = { key: '', value: Infinity };
 
   const fl1 = present();
+
   // loop through the array of sorted keys, find lowest
   Object.keys(ordered_obj).forEach(key => {
 
     // nothing left, early exit
     if (!ordered_obj[key].length) {
+      delete ordered_obj[key];
       return;
     }
+    const gg1 = present();
     const value = Number(ordered_obj[key][0].split('_')[0]);
+    const gg2 = present();
+    total_convert = total_convert + (gg2 - gg1);
+
+
     if (value < lowest.value) {
       lowest.key = key;
       lowest.value = value;
@@ -195,12 +203,10 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
     const a_next_lowest = ordered_obj[lowest.key].shift();
 
     // loop through all matches to find where match resides
-    Object.keys(matches).forEach(sub_matches => {
-      Object.keys(matches[sub_matches]).forEach(sm => {
-        if (sm === a_next_lowest) {
-          a_match = matches[sub_matches][sm];
-        }
-      });
+    Object.keys(matches[lowest.key]).forEach(sm => {
+      if (sm === a_next_lowest) {
+        a_match = matches[lowest.key][sm];
+      }
     });
 
     const fm2 = present();
