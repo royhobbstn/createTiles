@@ -4,6 +4,8 @@
 
 const present = require('present');
 
+const aa = present();
+
 const fs = require('fs');
 const turf = require('@turf/turf');
 
@@ -51,8 +53,6 @@ const DESIRED_NUMBER_FEATURES = parseInt((geojson_feature_count * pct_features_t
 const REDUCTIONS_NEEDED = STARTING_GEOJSON_FEATURE_COUNT - DESIRED_NUMBER_FEATURES;
 
 /*** Mutable Globals ***/
-
-let matches = {};
 
 const ordered_obj = {};
 
@@ -159,11 +159,6 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
 
   const fl1 = present();
 
-  //   best_match.coalescability = coalescability;
-  // best_match.c_counter = c_counter;
-  // best_match.match = [feature.properties.GEOID, near_feature.properties.GEOID];
-  // best_match.geo_division = geo_division;
-
   // loop through the array of sorted keys, find lowest
   Object.keys(ordered_obj).forEach(geodiv => {
 
@@ -194,46 +189,24 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
   }
   else {
 
-    // console.log(lowest);
-
-    // console.log('----');
-    // console.log(JSON.stringify(ordered_obj));
-
-    // process.exit();
-
     const fm1 = present();
     // lowest found, now grab it
     const a_next_lowest = ordered_obj[lowest.key].shift();
 
-    console.log(a_next_lowest);
-
-    // loop through all matches to find where match resides
-    Object.keys(matches[lowest.key]).forEach(sm => {
-      if (sm === a_next_lowest.coalescability + a_next_lowest.c_counter) {
-        a_match = matches[lowest.key][sm];
-      }
-    });
-
-    console.log(a_match);
-    console.log('');
+    a_match = a_next_lowest.match;
 
     const fm2 = present();
     total_find_match = total_find_match + (fm2 - fm1);
   }
 
-
   const m2 = present();
   total_sort = total_sort + (m2 - m1);
-
-  // console.log(a_match);
-  // process.exit();
 
   // are there still a pool of features remaining that can be simplified?
   // sometimes constraints such as making sure features are not combined
   // across county lines creates situations where we exhaust the pool of
   // features able to be combined for low (zoomed out) zoom levels
   if (!a_match) {
-    console.log('AAHHAHHAHA');
     can_still_simplify = false;
   }
   else {
@@ -269,21 +242,19 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
     const add2 = present();
     add_remove = add_remove + (add2 - add1);
 
-    // TODO something wrong starting here maybe?
     const f1 = present();
-    // go back through all features and recompute everything that was affected by the above transformation
-    Object.keys(matches[geo_division]).forEach(key => {
-      const geoid_array = matches[geo_division][key];
+
+    // go back through all features and remove everything that was affected by the above transformation
+    ordered_obj[geo_division] = ordered_obj[geo_division].filter(item => {
+      const geoid_array = item.match;
+
       if (geoid_array[0] === prop_a || geoid_array[0] === prop_b || geoid_array[1] === prop_a || geoid_array[1] === prop_b) {
-
-        // console.log(ordered_obj[geo_division]);
-        // console.log(key);
-        // process.exit();
-
-        delete matches[geo_division][key];
-        removeAnElement(ordered_obj[geo_division], key);
+        return false;
       }
+      return true;
+
     });
+
     const f2 = present();
     total_filter = total_filter + (f2 - f1);
 
@@ -319,6 +290,7 @@ const geojson_array = Object.keys(keyed_geojson).map(feature => {
 
 // save combined geojson to file
 fs.writeFileSync(`./aggregated-geojson/${GEOTYPE}_${ZOOMLEVEL}.json`, JSON.stringify(turf.featureCollection(geojson_array)), 'utf8');
+console.log(present() - aa);
 
 
 /*** Functions ***/
@@ -385,7 +357,7 @@ function computeFeature(feature) {
 
       // we only care about registering the best match; coalescibility will
       // be recalculated as soon as a feature is joined to another,
-      // rendering lesser matches useless
+      // rendering a lesser match useless
       if (coalescability < best_match.coalescability) {
         best_match.coalescability = coalescability;
         best_match.c_counter = c_counter;
@@ -408,11 +380,6 @@ function computeFeature(feature) {
 
     inOrder(ordered_obj[best_match.geo_division], best_match);
 
-
-    if (!matches[best_match.geo_division]) {
-      matches[best_match.geo_division] = {};
-    }
-    matches[best_match.geo_division][best_match.coalescability + best_match.c_counter] = best_match.match;
   }
   const or2 = present();
   total_in_order = total_in_order + (or2 - or1);
@@ -432,17 +399,6 @@ function inOrder(arr, item) {
   arr.splice(ix, 0, item);
 }
 
-
-function removeAnElement(array, item) {
-
-  for (let index = 0; index < array.length; index++) {
-    if (array[index].coalescability + array[index].c_counter === item) {
-      array.splice(index, 1);
-      break;
-    }
-  }
-
-}
 
 // set limit on which geo level a geography can simplify up to
 function getGeoidSlice(geo) {
