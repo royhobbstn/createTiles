@@ -198,13 +198,12 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
   }
   else {
 
+    // console.log(lowest);
 
-    console.log(lowest);
+    // console.log('----');
+    // console.log(ordered_obj);
 
-    console.log('----');
-    console.log(ordered_obj);
-
-    process.exit();
+    // process.exit();
 
     const fm1 = present();
     // lowest found, now grab it
@@ -225,6 +224,8 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
   const m2 = present();
   total_sort = total_sort + (m2 - m1);
 
+  // console.log(a_match);
+  // process.exit();
 
   // are there still a pool of features remaining that can be simplified?
   // sometimes constraints such as making sure features are not combined
@@ -271,6 +272,10 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
     Object.keys(matches[geo_division]).forEach(key => {
       const geoid_array = matches[geo_division][key];
       if (geoid_array[0] === prop_a || geoid_array[0] === prop_b || geoid_array[1] === prop_a || geoid_array[1] === prop_b) {
+        // console.log(ordered_obj[geo_division]);
+        // console.log(key);
+        // process.exit();
+
         delete matches[geo_division][key];
         removeAnElement(ordered_obj[geo_division], key);
       }

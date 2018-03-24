@@ -194,9 +194,18 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
   }
   else {
 
+    // console.log(lowest);
+
+    // console.log('----');
+    // console.log(JSON.stringify(ordered_obj));
+
+    // process.exit();
+
     const fm1 = present();
     // lowest found, now grab it
     const a_next_lowest = ordered_obj[lowest.key].shift();
+
+    console.log(a_next_lowest);
 
     // loop through all matches to find where match resides
     Object.keys(matches[lowest.key]).forEach(sm => {
@@ -204,6 +213,9 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
         a_match = matches[lowest.key][sm];
       }
     });
+
+    console.log(a_match);
+    console.log('');
 
     const fm2 = present();
     total_find_match = total_find_match + (fm2 - fm1);
@@ -213,6 +225,8 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
   const m2 = present();
   total_sort = total_sort + (m2 - m1);
 
+  // console.log(a_match);
+  // process.exit();
 
   // are there still a pool of features remaining that can be simplified?
   // sometimes constraints such as making sure features are not combined
@@ -261,9 +275,13 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
     Object.keys(matches[geo_division]).forEach(key => {
       const geoid_array = matches[geo_division][key];
       if (geoid_array[0] === prop_a || geoid_array[0] === prop_b || geoid_array[1] === prop_a || geoid_array[1] === prop_b) {
+
+        // console.log(ordered_obj[geo_division]);
+        // console.log(key);
+        // process.exit();
+
         delete matches[geo_division][key];
-        console.log(key);
-        //removeAnElement(ordered_obj[geo_division], key);
+        removeAnElement(ordered_obj[geo_division], key);
       }
     });
     const f2 = present();
@@ -416,10 +434,14 @@ function inOrder(arr, item) {
 
 
 function removeAnElement(array, item) {
-  var index = array.indexOf(item);
-  if (-1 !== index) {
-    array.splice(index, 1);
+
+  for (let index = 0; index < array.length; index++) {
+    if (array[index].coalescability + array[index].c_counter === item) {
+      array.splice(index, 1);
+      break;
+    }
   }
+
 }
 
 // set limit on which geo level a geography can simplify up to
