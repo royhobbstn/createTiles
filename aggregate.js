@@ -33,13 +33,14 @@ let geojson_feature_count = STARTING_GEOJSON_FEATURE_COUNT;
 
 console.log(geojson_feature_count);
 
+// TODO different for every geo level?
 const zoom_features = {
-  '3': .07,
-  '4': .14,
-  '5': .21,
-  '6': .28,
-  '7': .42,
-  '8': .57
+  '3': .02,
+  '4': .06,
+  '5': .12,
+  '6': .24,
+  '7': .36,
+  '8': .48
 };
 
 const pct_features_to_keep = zoom_features[ZOOMLEVEL];
@@ -55,10 +56,8 @@ const REDUCTIONS_NEEDED = STARTING_GEOJSON_FEATURE_COUNT - DESIRED_NUMBER_FEATUR
 /*** Mutable Globals ***/
 
 const ordered_obj = {};
-
-let counter = 0;
 const keyed_geojson = {};
-
+let counter = 0;
 
 /*** Initial index creation and calculation ***/
 
@@ -67,23 +66,17 @@ const tree = geojsonRbush();
 tree.load(geojson_file);
 
 const start_index_time = present();
-let total_bbox = 0;
 let total_trse = 0;
-let total_nf = 0;
 let total_bm = 0;
-let total_in_order = 0;
 let total_actual_intersect = 0;
 
 geojson_file.features.forEach((feature, index) => {
   if (index % 100 === 0) {
     const index_time = present() - start_index_time;
     console.log('index progress (1/2) ' + ((index / geojson_feature_count) * 100).toFixed(2) + '%');
-    console.log(`   - bbox calc: ${total_bbox / index_time}`);
     console.log(`   - tree search: ${total_trse / index_time}`);
-    console.log(`   - nearby filtered: ${total_nf / index_time}`);
     console.log(`   - intersection: ${total_bm / index_time}`);
     console.log(`   -   actual inter: ${total_actual_intersect / index_time}`);
-    console.log(`   - push to ordered array: ${total_in_order / index_time}`);
     console.log('');
   }
 
@@ -104,15 +97,9 @@ let total_compute_features = 0;
 let total_union = 0;
 let tree_operations = 0;
 let total_find_lowest = 0;
-let total_find_match = 0;
-let total_start = 0;
-let add_remove = 0;
 let total_convert = 0;
 
-total_in_order = 0;
-total_bbox = 0;
 total_trse = 0;
-total_nf = 0;
 total_bm = 0;
 
 
@@ -120,35 +107,24 @@ total_bm = 0;
 
 while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) {
 
-  const ii1 = present();
-
   if (geojson_feature_count % 10 === 0) {
     const current_time = present() - initial;
     const progress = ((STARTING_GEOJSON_FEATURE_COUNT - geojson_feature_count) / REDUCTIONS_NEEDED) * 100;
     console.log('compute progress (2/2) ' + progress.toFixed(2) + '%');
-    console.log(`start / console: ${total_start / current_time}`);
     console.log(`lowest: ${total_sort / current_time}`);
     console.log(` - find lowest: ${total_find_lowest / current_time}`);
     console.log(`   - convert: ${total_convert / current_time}`);
-    console.log(` - find match: ${total_find_match / current_time}`);
 
     console.log(`union: ${total_union / current_time}`);
-    console.log(`add_remove geojson: ${add_remove / current_time}`);
     console.log(`filter: ${total_filter / current_time}`);
     console.log(`tree operations: ${tree_operations / current_time}`);
 
     console.log(`compute features: ${total_compute_features / current_time}`);
-    console.log(`   - bbox calc: ${total_bbox / current_time}`);
     console.log(`   - tree search: ${total_trse / current_time}`);
-    console.log(`   - nearby filtered: ${total_nf / current_time}`);
     console.log(`   - intersection: ${total_bm / current_time}`);
-    console.log(`   - push to ordered array: ${total_in_order / current_time}`);
 
     console.log('');
   }
-
-  const ii2 = present();
-  total_start = total_start + (ii2 - ii1);
 
   // error check this for nothing left in coalesced_scores array
   const m1 = present();
@@ -167,17 +143,14 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
       delete ordered_obj[geodiv];
       return;
     }
-    const gg1 = present();
-    const value = ordered_obj[geodiv][0].coalescability;
-    const counter = ordered_obj[geodiv][0].c_counter;
-    const gg2 = present();
-    total_convert = total_convert + (gg2 - gg1);
 
+    const item = ordered_obj[geodiv][0];
+    const value = item.coalescability;
 
     if (value < lowest.value) {
       lowest.key = geodiv;
       lowest.value = value;
-      lowest.count = counter;
+      lowest.count = item.c_counter;
     }
   });
   const fl2 = present();
@@ -189,14 +162,9 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
   }
   else {
 
-    const fm1 = present();
     // lowest found, now grab it
     const a_next_lowest = ordered_obj[lowest.key].shift();
-
     a_match = a_next_lowest.match;
-
-    const fm2 = present();
-    total_find_match = total_find_match + (fm2 - fm1);
   }
 
   const m2 = present();
@@ -224,7 +192,6 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
     const tu2 = present();
     total_union = total_union + (tu2 - tu1);
 
-    const add1 = present();
     // overwrite properties with new geoid
     combined.properties = {
       GEOID: combined_geoid
@@ -238,9 +205,6 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
     delete keyed_geojson[a_match[1]];
 
     geojson_feature_count--;
-
-    const add2 = present();
-    add_remove = add_remove + (add2 - add1);
 
     const f1 = present();
 
@@ -297,10 +261,7 @@ console.log(present() - aa);
 
 function computeFeature(feature) {
 
-  const bb1 = present();
   const bbox = turf.bbox(feature);
-  const bb2 = present();
-  total_bbox = total_bbox + (bb2 - bb1);
 
   const trs1 = present();
   const nearby = tree.search(bbox);
@@ -308,7 +269,6 @@ function computeFeature(feature) {
   total_trse = total_trse + (trs2 - trs1);
 
 
-  const nf1 = present();
   const nearby_filtered = nearby.features.filter(d => {
     // ignore self
     const not_self = d.properties.GEOID !== feature.properties.GEOID;
@@ -318,9 +278,6 @@ function computeFeature(feature) {
     const not_different_geo = geo_slice_a === geo_slice_b;
     return (not_self && not_different_geo);
   });
-  const nf2 = present();
-  total_nf = total_nf + (nf2 - nf1);
-
 
   const bm1 = present();
   const best_match = {
@@ -371,18 +328,12 @@ function computeFeature(feature) {
   total_bm = total_bm + (bm2 - bm1);
 
 
-  const or1 = present();
   if (best_match.match.length) {
-
     if (!ordered_obj[best_match.geo_division]) {
       ordered_obj[best_match.geo_division] = [];
     }
-
     inOrder(ordered_obj[best_match.geo_division], best_match);
-
   }
-  const or2 = present();
-  total_in_order = total_in_order + (or2 - or1);
 
 }
 

@@ -73,6 +73,11 @@ then
     node --max_old_space_size=8192 aggregate.js "$geolayer" 8
     # level 9 is full detail.  do not aggregate.
     
+    # in turn loop through all files and create metadata
+    # convert GEOID_GEOID_GEOID to single lookup key and save to metadata bucket
+    node --max_old_space_size=8192 cleanAggregatedFiles.js "$geolayer"
+    
+    # TODO ./aggregated-geojson to ./aggregated-cleaned
     # create tilesets for each individual zoomlevel
     tippecanoe -o ./tiled-aggregated/"$geolayer"_3.mbtiles -l main -ab -pt -z3 -Z3 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_3.json
     tippecanoe -o ./tiled-aggregated/"$geolayer"_4.mbtiles -l main -ab -pt -z4 -Z4 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_4.json
