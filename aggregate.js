@@ -59,7 +59,6 @@ const ordered_obj = {};
 let counter = 0;
 const keyed_geojson = {};
 
-let building_index = true;
 
 /*** Initial index creation and calculation ***/
 
@@ -94,16 +93,6 @@ geojson_file.features.forEach((feature, index) => {
 
 
 /****** Setup ******/
-
-building_index = false;
-
-// sort each array (one per key) in object
-Object.keys(ordered_obj).forEach(key => {
-  ordered_obj[key].sort((a, b) => {
-    return Number(a.split('_')[0]) - Number(b.split('_')[0]);
-  });
-});
-
 
 
 let can_still_simplify = true;
@@ -170,23 +159,30 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
 
   const fl1 = present();
 
+  //   best_match.coalescability = coalescability;
+  // best_match.c_counter = c_counter;
+  // best_match.match = [feature.properties.GEOID, near_feature.properties.GEOID];
+  // best_match.geo_division = geo_division;
+
   // loop through the array of sorted keys, find lowest
-  Object.keys(ordered_obj).forEach(key => {
+  Object.keys(ordered_obj).forEach(geodiv => {
 
     // nothing left, early exit
-    if (!ordered_obj[key].length) {
-      delete ordered_obj[key];
+    if (!ordered_obj[geodiv].length) {
+      delete ordered_obj[geodiv];
       return;
     }
     const gg1 = present();
-    const value = Number(ordered_obj[key][0].split('_')[0]);
+    const value = ordered_obj[geodiv][0].coalescability;
+    const counter = ordered_obj[geodiv][0].c_counter;
     const gg2 = present();
     total_convert = total_convert + (gg2 - gg1);
 
 
     if (value < lowest.value) {
-      lowest.key = key;
+      lowest.key = geodiv;
       lowest.value = value;
+      lowest.count = counter;
     }
   });
   const fl2 = present();
@@ -201,7 +197,7 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
     // console.log(lowest);
 
     // console.log('----');
-    // console.log(ordered_obj);
+    // console.log(JSON.stringify(ordered_obj));
 
     // process.exit();
 
@@ -209,12 +205,17 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
     // lowest found, now grab it
     const a_next_lowest = ordered_obj[lowest.key].shift();
 
+    console.log(a_next_lowest);
+
     // loop through all matches to find where match resides
     Object.keys(matches[lowest.key]).forEach(sm => {
-      if (sm === a_next_lowest) {
+      if (sm === a_next_lowest.coalescability + a_next_lowest.c_counter) {
         a_match = matches[lowest.key][sm];
       }
     });
+
+    console.log(a_match);
+    console.log('');
 
     const fm2 = present();
     total_find_match = total_find_match + (fm2 - fm1);
@@ -232,6 +233,7 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
   // across county lines creates situations where we exhaust the pool of
   // features able to be combined for low (zoomed out) zoom levels
   if (!a_match) {
+    console.log('AAHHAHHAHA');
     can_still_simplify = false;
   }
   else {
@@ -267,11 +269,13 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
     const add2 = present();
     add_remove = add_remove + (add2 - add1);
 
+    // TODO something wrong starting here maybe?
     const f1 = present();
     // go back through all features and recompute everything that was affected by the above transformation
     Object.keys(matches[geo_division]).forEach(key => {
       const geoid_array = matches[geo_division][key];
       if (geoid_array[0] === prop_a || geoid_array[0] === prop_b || geoid_array[1] === prop_a || geoid_array[1] === prop_b) {
+
         // console.log(ordered_obj[geo_division]);
         // console.log(key);
         // process.exit();
@@ -348,8 +352,7 @@ function computeFeature(feature) {
 
   const bm1 = present();
   const best_match = {
-    raw_coalescability: Infinity,
-    coalescability: '',
+    coalescability: Infinity,
     match: [],
     geo_division: ''
   };
@@ -377,15 +380,15 @@ function computeFeature(feature) {
 
       counter++;
 
-      const raw_coalescability = inverse_shared_edge * combined_area;
-      const coalescability = String(raw_coalescability) + `_${counter}`;
+      const coalescability = inverse_shared_edge * combined_area;
+      const c_counter = `_${counter}`;
 
       // we only care about registering the best match; coalescibility will
       // be recalculated as soon as a feature is joined to another,
       // rendering lesser matches useless
-      if (raw_coalescability < best_match.raw_coalescability) {
-        best_match.raw_coalescability = raw_coalescability;
+      if (coalescability < best_match.coalescability) {
         best_match.coalescability = coalescability;
+        best_match.c_counter = c_counter;
         best_match.match = [feature.properties.GEOID, near_feature.properties.GEOID];
         best_match.geo_division = geo_division;
       }
@@ -398,20 +401,18 @@ function computeFeature(feature) {
 
   const or1 = present();
   if (best_match.match.length) {
-    if (building_index) {
-      if (!ordered_obj[best_match.geo_division]) {
-        ordered_obj[best_match.geo_division] = [];
-      }
-      ordered_obj[best_match.geo_division].push(best_match.coalescability);
+
+    if (!ordered_obj[best_match.geo_division]) {
+      ordered_obj[best_match.geo_division] = [];
     }
-    else {
-      inOrder(ordered_obj[best_match.geo_division], best_match.coalescability);
-    }
+
+    inOrder(ordered_obj[best_match.geo_division], best_match);
+
 
     if (!matches[best_match.geo_division]) {
       matches[best_match.geo_division] = {};
     }
-    matches[best_match.geo_division][best_match.coalescability] = best_match.match;
+    matches[best_match.geo_division][best_match.coalescability + best_match.c_counter] = best_match.match;
   }
   const or2 = present();
   total_in_order = total_in_order + (or2 - or1);
@@ -424,19 +425,23 @@ function inOrder(arr, item) {
 
   let ix = 0;
   while (ix < arr.length) {
-    if (Number(item.split('_')[0]) < Number(arr[ix].split('_')[0])) { break; }
+    if (item.coalescability < arr[ix].coalescability) { break; }
     ix++;
   }
 
   arr.splice(ix, 0, item);
 }
 
-// https://stackoverflow.com/a/3774149/8896489
+
 function removeAnElement(array, item) {
-  var index = array.indexOf(item);
-  if (-1 !== index) {
-    array.splice(index, 1);
+
+  for (let index = 0; index < array.length; index++) {
+    if (array[index].coalescability + array[index].c_counter === item) {
+      array.splice(index, 1);
+      break;
+    }
   }
+
 }
 
 // set limit on which geo level a geography can simplify up to
