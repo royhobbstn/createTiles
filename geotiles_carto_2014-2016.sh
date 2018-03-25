@@ -15,8 +15,8 @@ npm install -g mapshaper
 declare -a state_fips=('01' '02' '04' '05' '06' '08' '09' '10' '11' '12' '13' '15' '16' '17' '18' '19' '20' '21' '22' '23' '24' '25' '26' '27' '28' '29' '30' '31' '32' '33' '34' '35' '36' '37' '38' '39' '40' '41' '42' '44' '45' '46' '47' '48' '49' '50' '51' '53' '54' '55' '56' '60' '66' '69' '72' '78');
 
 # clean old (just in case) and create temporary directories
-rm -rf ./downloads ./geojson ./tiles ./unzipped ./merged-geojson ./aggregated-geojson ./tiled-aggregated
-mkdir ./downloads ./geojson ./tiles ./unzipped ./merged-geojson ./aggregated-geojson ./tiled-aggregated
+rm -rf ./downloads ./geojson ./tiles ./unzipped ./merged-geojson ./aggregated-geojson ./tiled-aggregated ./aggregated-geojson ./aggregated-cleaned ./indexed
+mkdir ./downloads ./geojson ./tiles ./unzipped ./merged-geojson ./aggregated-geojson ./tiled-aggregated ./aggregated-geojson ./aggregated-cleaned ./indexed
 
 numberargs=$#
 
@@ -62,34 +62,36 @@ then
     fi
     
     # combine all state geojson into a single file
-    mapshaper -i ./geojson/*.geojson combine-files -merge-layers -o ./merged-geojson/"$geolayer".json 
+    mapshaper -i ./geojson/*.geojson combine-files -merge-layers -o ./merged-geojson/"$geolayer"_"$year".json 
+  
+    node --max_old_space_size=8192 createIndex.js "$geolayer" "$year"
     
     # aggregate shapes when zoomed out.  aggregation level scales with zoom.
-    node --max_old_space_size=8192 aggregate.js "$geolayer" 3
-    node --max_old_space_size=8192 aggregate.js "$geolayer" 4
-    node --max_old_space_size=8192 aggregate.js "$geolayer" 5
-    node --max_old_space_size=8192 aggregate.js "$geolayer" 6
-    node --max_old_space_size=8192 aggregate.js "$geolayer" 7
-    node --max_old_space_size=8192 aggregate.js "$geolayer" 8
+    node --max_old_space_size=8192 aggregate.js "$geolayer" 3 "$year" .02
+    node --max_old_space_size=8192 aggregate.js "$geolayer" 4 "$year" .06
+    node --max_old_space_size=8192 aggregate.js "$geolayer" 5 "$year" .12
+    node --max_old_space_size=8192 aggregate.js "$geolayer" 6 "$year" .24
+    node --max_old_space_size=8192 aggregate.js "$geolayer" 7 "$year" .36
+    node --max_old_space_size=8192 aggregate.js "$geolayer" 8 "$year" .48
     # level 9 is full detail.  do not aggregate.
     
     # in turn loop through all files and create metadata
     # convert GEOID_GEOID_GEOID to single lookup key and save to metadata bucket
-    node --max_old_space_size=8192 cleanAggregatedFiles.js "$geolayer"
+    node --max_old_space_size=8192 cleanAggregatedFiles.js "$geolayer" "$year"
     
     # TODO ./aggregated-geojson to ./aggregated-cleaned
     # create tilesets for each individual zoomlevel
-    tippecanoe -o ./tiled-aggregated/"$geolayer"_3.mbtiles -l main -ab -pt -z3 -Z3 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_3.json
-    tippecanoe -o ./tiled-aggregated/"$geolayer"_4.mbtiles -l main -ab -pt -z4 -Z4 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_4.json
-    tippecanoe -o ./tiled-aggregated/"$geolayer"_5.mbtiles -l main -ab -pt -z5 -Z5 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_5.json
-    tippecanoe -o ./tiled-aggregated/"$geolayer"_6.mbtiles -l main -ab -pt -z6 -Z6 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_6.json
-    tippecanoe -o ./tiled-aggregated/"$geolayer"_7.mbtiles -l main -ab -pt -z7 -Z7 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_7.json
-    tippecanoe -o ./tiled-aggregated/"$geolayer"_8.mbtiles -l main -ab -pt -z8 -Z8 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_8.json
-    tippecanoe -o ./tiled-aggregated/"$geolayer"_9.mbtiles -l main -ab -pt -z9 -Z9 -y GEOID `echo $NM` -M 250000 ./merged-geojson/"$geolayer".json
+    tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_3.mbtiles -l main -ab -pt -z3 -Z3 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_"$year"_3.json
+    tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_4.mbtiles -l main -ab -pt -z4 -Z4 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_"$year"_4.json
+    tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_5.mbtiles -l main -ab -pt -z5 -Z5 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_"$year"_5.json
+    tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_6.mbtiles -l main -ab -pt -z6 -Z6 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_"$year"_6.json
+    tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_7.mbtiles -l main -ab -pt -z7 -Z7 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_"$year"_7.json
+    tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_8.mbtiles -l main -ab -pt -z8 -Z8 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_"$year"_8.json
+    tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_9.mbtiles -l main -ab -pt -z9 -Z9 -y GEOID `echo $NM` -M 250000 ./merged-geojson/"$geolayer"_"$year".json
     
     # join all individual zoom level tiles together
     # tile-join -e ./tiles/"$geolayer"_"$year" ./tiled-aggregated/"$geolayer"_*.mbtiles
-    tile-join -o ./tiles/"$geolayer"_"$year".mbtiles ./tiled-aggregated/"$geolayer"_*.mbtiles
+    tile-join -o ./tiles/"$geolayer"_"$year".mbtiles ./tiled-aggregated/"$geolayer"_"$year"_*.mbtiles
 fi
 
     # Upload directory to s3
@@ -100,4 +102,4 @@ fi
 
     
 # clean up
-# rm -rf ./downloads ./geojson ./tiles ./unzipped ./merged-geojson ./aggregated-geojson ./tiled-aggregated
+# rm -rf ./downloads ./geojson ./tiles ./unzipped ./merged-geojson ./aggregated-geojson ./tiled-aggregated ./aggregated-geojson ./aggregated-cleaned ./indexed
