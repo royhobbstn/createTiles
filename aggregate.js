@@ -77,7 +77,7 @@ const HIGH_ZOOM = 8;
 
 /****** Setup ******/
 
-const STARTING_GEOJSON_FEATURE_COUNT = geojson_feature_count.length;
+const STARTING_GEOJSON_FEATURE_COUNT = geojson_feature_count;
 
 // set an array of feature thresholds
 for (let i = LOW_ZOOM; i <= HIGH_ZOOM; i++) {
@@ -88,10 +88,6 @@ const DESIRED_NUMBER_FEATURES = parseInt((geojson_feature_count * RETAINED[LOW_Z
 const REDUCTIONS_NEEDED = STARTING_GEOJSON_FEATURE_COUNT - DESIRED_NUMBER_FEATURES;
 
 let can_still_simplify = true;
-
-console.log(DESIRED_NUMBER_FEATURES);
-console.log(REDUCTIONS_NEEDED);
-process.exit();
 
 
 /****** Do this is in a loop ******/
@@ -266,12 +262,12 @@ function getRetained(geo) {
   }
   else if (geo === 'tract') {
     return {
-      '3': .04,
-      '4': .08,
-      '5': .16,
-      '6': .32,
-      '7': .48,
-      '8': .64
+      '3': .06,
+      '4': .12,
+      '5': .24,
+      '6': .40,
+      '7': .60,
+      '8': .80
     };
   }
   else {

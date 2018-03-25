@@ -72,6 +72,8 @@ then
     # convert GEOID_GEOID_GEOID to single lookup key and save to metadata bucket
     node --max_old_space_size=8192 cleanAggregatedFiles.js "$geolayer" "$year"
     
+    #TODO upload metadata to bucket
+    
     # create tilesets for each individual zoomlevel
     tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_3.mbtiles -l main -ab -pt -z3 -Z3 -y GEOID `echo $NM` -M 250000 ./aggregated-cleaned/"$geolayer"_"$year"_3.json
     tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_4.mbtiles -l main -ab -pt -z4 -Z4 -y GEOID `echo $NM` -M 250000 ./aggregated-cleaned/"$geolayer"_"$year"_4.json
