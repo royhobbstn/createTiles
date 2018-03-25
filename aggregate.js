@@ -1,70 +1,118 @@
-// continually combine smaller features.  
-// without aggregating across state or county lines
-// note: this is beautiful
-
-const present = require('present');
-const geojsonRbush = require('geojson-rbush').default;
 const fs = require('fs');
-const turf = require('@turf/turf');
+const geojsonRbush = require('geojson-rbush').default;
 const { computeFeature } = require('./computeFeature.js');
+const present = require('present');
+const turf = require('@turf/turf');
 
-const aa = present(); // tracks total execution time
-
-// node --max_old_space_size=8192 aggregate.js bg 3 2016
-// (geotype, zoomlevel, year)
+// node --max_old_space_size=8192 createIndex.js bg 2016
+// (geotype, year)
 
 console.log(`geotype: ${process.argv[2]}`);
-console.log(`zoomlevel: ${process.argv[3]}`);
-console.log(`year: ${process.argv[4]}`);
+console.log(`year: ${process.argv[3]}`);
 
-
-if (!process.argv[2] || !process.argv[3] || !process.argv[4]) {
-  console.log('missing arguments: (geotype, zoomlevel, year, retain pct');
-  console.log('run like: node --max_old_space_size=8192 aggregate.js bg 3 2016');
+if (!process.argv[2] || !process.argv[3]) {
+  console.log('missing arguments: (geotype, year');
+  console.log('run like: node --max_old_space_size=8192 createIndex.js bg 2016');
   process.exit();
 }
 
 const GEOTYPE = process.argv[2];
-const ZOOMLEVEL = process.argv[3];
-const YEAR = process.argv[4];
-const RETAINED = getRetained(GEOTYPE, ZOOMLEVEL);
-
+const YEAR = process.argv[3];
 const SLICE = getGeoidSlice(GEOTYPE);
+
+const geojson_file = require(`./merged-geojson/${GEOTYPE}_${YEAR}.json`);
+let geojson_feature_count = geojson_file.features.length;
+console.log(geojson_feature_count);
 
 
 /*** Mutable Globals ***/
 
-const indexed = require(`./indexed/${GEOTYPE}_${YEAR}.json`);
+const ordered_obj = {};
+const keyed_geojson = {};
+let counter = 0;
+const threshold = [];
 
-const ordered_obj = indexed.ordered_obj;
-const keyed_geojson = indexed.keyed_geojson;
-let counter = indexed.counter;
+/*** Initial index creation and calculation ***/
+
 const tree = geojsonRbush();
-tree.fromJSON(indexed.tree);
+tree.load(geojson_file);
+
+geojson_file.features.forEach((feature, index) => {
+  if (index % 100 === 0) {
+    console.log('index progress: ' + ((index / geojson_feature_count) * 100).toFixed(2) + '%');
+  }
+
+  keyed_geojson[feature.properties.GEOID] = Object.assign({}, feature, { properties: { GEOID: feature.properties.GEOID } });
+  computeFeature(feature, tree, ordered_obj, counter, SLICE);
+});
+
+/********* main ************/
+
+// continually combine smaller features.  
+// without aggregating across state or county lines
+// note: this is beautiful
+
+
+
+const aa = present(); // tracks total execution time
+
+// node --max_old_space_size=8192 aggregate.js bg 2016
+// (geotype, zoomlevel, year)
+
+console.log(`geotype: ${process.argv[2]}`);
+console.log(`year: ${process.argv[3]}`);
+
+
+if (!process.argv[2] || !process.argv[3]) {
+  console.log('missing arguments: (geotype, year');
+  console.log('run like: node --max_old_space_size=8192 aggregate.js bg 2016');
+  process.exit();
+}
+
+const RETAINED = getRetained(GEOTYPE);
+
+const LOW_ZOOM = 3;
+const HIGH_ZOOM = 8;
+
 
 /****** Setup ******/
 
-const STARTING_GEOJSON_FEATURE_COUNT = Object.keys(keyed_geojson).length;
-let geojson_feature_count = STARTING_GEOJSON_FEATURE_COUNT;
+const STARTING_GEOJSON_FEATURE_COUNT = geojson_feature_count.length;
 
-console.log(geojson_feature_count);
+// set an array of feature thresholds
+for (let i = LOW_ZOOM; i <= HIGH_ZOOM; i++) {
+  threshold.push({ count: parseInt((geojson_feature_count * RETAINED[i]), 10), zoom: i });
+}
 
-const DESIRED_NUMBER_FEATURES = parseInt((geojson_feature_count * RETAINED), 10);
+const DESIRED_NUMBER_FEATURES = parseInt((geojson_feature_count * RETAINED[LOW_ZOOM]), 10);
 const REDUCTIONS_NEEDED = STARTING_GEOJSON_FEATURE_COUNT - DESIRED_NUMBER_FEATURES;
 
 let can_still_simplify = true;
+
+console.log(DESIRED_NUMBER_FEATURES);
+console.log(REDUCTIONS_NEEDED);
+process.exit();
 
 
 /****** Do this is in a loop ******/
 
 while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) {
 
-  // TODO check if a RETAINED threshold has been met.
-  // Possibly run cleanAggregatedFiles on it (as module);
+  // a zoom level threshold has been reached.  save that zoomlevel.
+  threshold.forEach(obj => {
+    if (geojson_feature_count === obj.count) {
+      // convert keyed geojson back to array
+      const geojson_array = Object.keys(keyed_geojson).map(feature => {
+        return keyed_geojson[feature];
+      });
+      console.log('writing zoomlevel: ' + obj.zoom);
+      fs.writeFileSync(`./aggregated-geojson/${GEOTYPE}_${YEAR}_${obj.zoom}.json`, JSON.stringify(turf.featureCollection(geojson_array)), 'utf8');
+    }
+  });
 
   if (geojson_feature_count % 10 === 0) {
     const progress = ((STARTING_GEOJSON_FEATURE_COUNT - geojson_feature_count) / REDUCTIONS_NEEDED) * 100;
-    console.log(`compute progress ${GEOTYPE} ${ZOOMLEVEL} ${YEAR}: ${progress.toFixed(2)} %`);
+    console.log(`compute progress ${GEOTYPE} ${YEAR}: ${progress.toFixed(2)} %`);
   }
 
   // error check this for nothing left in coalesced_scores array
@@ -170,10 +218,13 @@ const geojson_array = Object.keys(keyed_geojson).map(feature => {
   return keyed_geojson[feature];
 });
 
-// save combined geojson to file
-fs.writeFileSync(`./aggregated-geojson/${GEOTYPE}_${ZOOMLEVEL}.json`, JSON.stringify(turf.featureCollection(geojson_array)), 'utf8');
+// presumably the lowest zoom level doesn't get reached since the loop terminates just before the count hits the target
+// so it is saved here, at the end of the program.
+fs.writeFileSync(`./aggregated-geojson/${GEOTYPE}_${YEAR}_${LOW_ZOOM}.json`, JSON.stringify(turf.featureCollection(geojson_array)), 'utf8');
 console.log(present() - aa);
 
+
+/*** Functions ***/
 
 
 // set limit on which geo level a geography can simplify up to
@@ -205,22 +256,22 @@ function getRetained(geo) {
   }
   else if (geo === 'place') {
     return {
-      '3': .02,
-      '4': .06,
-      '5': .12,
-      '6': .24,
-      '7': .36,
-      '8': .48
+      '3': .40,
+      '4': .50,
+      '5': .60,
+      '6': .70,
+      '7': .80,
+      '8': .90
     };
   }
   else if (geo === 'tract') {
     return {
-      '3': .02,
-      '4': .06,
-      '5': .12,
-      '6': .24,
-      '7': .36,
-      '8': .48
+      '3': .04,
+      '4': .08,
+      '5': .16,
+      '6': .32,
+      '7': .48,
+      '8': .64
     };
   }
   else {

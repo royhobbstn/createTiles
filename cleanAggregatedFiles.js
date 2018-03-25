@@ -20,9 +20,9 @@ const key = {};
 
 
 for (let i = 3; i <= 8; i++) {
-  const geojson = fs.readFileSync(`./aggregated-geojson/${GEOTYPE}_${i}.json`, 'utf8');
+  const geojson = JSON.parse(fs.readFileSync(`./aggregated-geojson/${GEOTYPE}_${YEAR}_${i}.json`, 'utf8'));
 
-  JSON.parse(geojson).features.forEach(feature => {
+  geojson.features.forEach(feature => {
     if (feature.properties.GEOID.includes('_')) {
       counter++;
 
