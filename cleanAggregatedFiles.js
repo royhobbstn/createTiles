@@ -19,7 +19,7 @@ let counter = 0;
 const key = {};
 
 
-for (let i = 3; i <= 3; i++) {
+for (let i = 3; i <= 8; i++) {
   const geojson = fs.readFileSync(`./aggregated-geojson/${GEOTYPE}_${i}.json`, 'utf8');
 
   JSON.parse(geojson).features.forEach(feature => {

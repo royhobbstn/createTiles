@@ -16,19 +16,18 @@ const aa = present(); // tracks total execution time
 console.log(`geotype: ${process.argv[2]}`);
 console.log(`zoomlevel: ${process.argv[3]}`);
 console.log(`year: ${process.argv[4]}`);
-console.log(`pct features retained: ${process.argv[5]}`);
 
 
-if (!process.argv[2] || !process.argv[3] || !process.argv[4] || !process.argv[5]) {
+if (!process.argv[2] || !process.argv[3] || !process.argv[4]) {
   console.log('missing arguments: (geotype, zoomlevel, year, retain pct');
-  console.log('run like: node --max_old_space_size=8192 aggregate.js bg 3 2016 .02');
+  console.log('run like: node --max_old_space_size=8192 aggregate.js bg 3 2016');
   process.exit();
 }
 
 const GEOTYPE = process.argv[2];
 const ZOOMLEVEL = process.argv[3];
 const YEAR = process.argv[4];
-const RETAINED = process.argv[5];
+const RETAINED = getRetained(GEOTYPE, ZOOMLEVEL);
 
 const SLICE = getGeoidSlice(GEOTYPE);
 
@@ -60,9 +59,12 @@ let can_still_simplify = true;
 
 while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) {
 
+  // TODO check if a RETAINED threshold has been met.
+  // Possibly run cleanAggregatedFiles on it (as module);
+
   if (geojson_feature_count % 10 === 0) {
     const progress = ((STARTING_GEOJSON_FEATURE_COUNT - geojson_feature_count) / REDUCTIONS_NEEDED) * 100;
-    console.log('compute progress: ' + progress.toFixed(2) + '%');
+    console.log(`compute progress ${GEOTYPE} ${ZOOMLEVEL} ${YEAR}: ${progress.toFixed(2)} %`);
   }
 
   // error check this for nothing left in coalesced_scores array
@@ -187,5 +189,42 @@ function getGeoidSlice(geo) {
   }
   else {
     console.log('unknown geo: ' + geo);
+  }
+}
+
+function getRetained(geo) {
+  if (geo === 'bg') {
+    return {
+      '3': .02,
+      '4': .06,
+      '5': .12,
+      '6': .24,
+      '7': .36,
+      '8': .48
+    };
+  }
+  else if (geo === 'place') {
+    return {
+      '3': .02,
+      '4': .06,
+      '5': .12,
+      '6': .24,
+      '7': .36,
+      '8': .48
+    };
+  }
+  else if (geo === 'tract') {
+    return {
+      '3': .02,
+      '4': .06,
+      '5': .12,
+      '6': .24,
+      '7': .36,
+      '8': .48
+    };
+  }
+  else {
+    console.log('unknown geo: ' + geo);
+    process.exit();
   }
 }
