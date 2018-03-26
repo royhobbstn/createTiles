@@ -67,10 +67,6 @@ then
     # aggregate shapes when zoomed out.  aggregation level scales with zoom.
     node --max_old_space_size=8192 aggregate.js "$geolayer" "$year"
 
-    # in turn loop through all files and create metadata
-    # convert GEOID_GEOID_GEOID to single lookup key and save to metadata bucket
-    # node --max_old_space_size=8192 cleanAggregatedFiles.js "$geolayer" "$year"
-    
     # upload metadata to bucket
     aws cp ./aggregated-metadata/"$geolayer"_"$year"_key.json s3://geotile-metadata
     
