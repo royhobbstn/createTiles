@@ -158,24 +158,29 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
     // we only use GEOID.  new geoid is just old geoids concatenated with _
     const properties_a = keyed_geojson[a_match[0]].properties;
     const properties_b = keyed_geojson[a_match[1]].properties;
+    const area_a = turf.area(keyed_geojson[a_match[0]]);
+    const area_b = turf.area(keyed_geojson[a_match[1]]);
+    console.log(area_a, area_b);
     const prop_a = properties_a.GEOID;
     const prop_b = properties_b.GEOID;
     const geo_division = properties_a.GEOID.slice(0, SLICE);
-    const combined_geoid = properties_a.GEOID + '_' + properties_b.GEOID;
+    const larger_geoid = (prop_a > prop_b) ? properties_a.GEOID : properties_b.GEOID;
 
     const combined = turf.union(keyed_geojson[a_match[0]], keyed_geojson[a_match[1]]);
 
-    // overwrite properties with new geoid
+    // overwrite properties with geoid of larger feature
+    // AA property is a flag for aggregated area
     combined.properties = {
-      GEOID: combined_geoid
+      GEOID: larger_geoid,
+      AA: true
     };
-
-    // create new combined feature
-    keyed_geojson[combined_geoid] = combined;
 
     // delete old features that were combined
     delete keyed_geojson[a_match[0]];
     delete keyed_geojson[a_match[1]];
+
+    // create new combined feature
+    keyed_geojson[larger_geoid] = combined;
 
     geojson_feature_count--;
 
@@ -252,8 +257,8 @@ function getRetained(geo) {
   }
   else if (geo === 'place') {
     return {
-      '3': .40,
-      '4': .50,
+      '3': .46,
+      '4': .48,
       '5': .60,
       '6': .70,
       '7': .80,

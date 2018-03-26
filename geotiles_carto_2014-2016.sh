@@ -66,31 +66,30 @@ then
   
     # aggregate shapes when zoomed out.  aggregation level scales with zoom.
     node --max_old_space_size=8192 aggregate.js "$geolayer" "$year"
-    # level 9 is full detail.  do not aggregate.
-    
+
     # in turn loop through all files and create metadata
     # convert GEOID_GEOID_GEOID to single lookup key and save to metadata bucket
-    node --max_old_space_size=8192 cleanAggregatedFiles.js "$geolayer" "$year"
+    # node --max_old_space_size=8192 cleanAggregatedFiles.js "$geolayer" "$year"
     
-    #TODO upload metadata to bucket
+    # upload metadata to bucket
+    aws cp ./aggregated-metadata/"$geolayer"_"$year"_key.json s3://geotile-metadata
     
     # create tilesets for each individual zoomlevel
-    tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_3.mbtiles -l main -ab -pt -z3 -Z3 -y GEOID `echo $NM` -M 250000 ./aggregated-cleaned/"$geolayer"_"$year"_3.json
-    tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_4.mbtiles -l main -ab -pt -z4 -Z4 -y GEOID `echo $NM` -M 250000 ./aggregated-cleaned/"$geolayer"_"$year"_4.json
-    tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_5.mbtiles -l main -ab -pt -z5 -Z5 -y GEOID `echo $NM` -M 250000 ./aggregated-cleaned/"$geolayer"_"$year"_5.json
-    tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_6.mbtiles -l main -ab -pt -z6 -Z6 -y GEOID `echo $NM` -M 250000 ./aggregated-cleaned/"$geolayer"_"$year"_6.json
-    tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_7.mbtiles -l main -ab -pt -z7 -Z7 -y GEOID `echo $NM` -M 250000 ./aggregated-cleaned/"$geolayer"_"$year"_7.json
-    tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_8.mbtiles -l main -ab -pt -z8 -Z8 -y GEOID `echo $NM` -M 250000 ./aggregated-cleaned/"$geolayer"_"$year"_8.json
+    tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_3.mbtiles -l main -ab -pt -z3 -D10 -Z3 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_"$year"_3.json
+    tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_4.mbtiles -l main -ab -pt -z4 -D11 -Z4 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_"$year"_4.json
+    tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_5.mbtiles -l main -ab -pt -z5 -Z5 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_"$year"_5.json
+    tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_6.mbtiles -l main -ab -pt -z6 -Z6 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_"$year"_6.json
+    tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_7.mbtiles -l main -ab -pt -z7 -Z7 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_"$year"_7.json
+    tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_8.mbtiles -l main -ab -pt -z8 -Z8 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_"$year"_8.json
     tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_9.mbtiles -l main -ab -pt -z9 -Z9 -y GEOID `echo $NM` -M 250000 ./merged-geojson/"$geolayer"_"$year".json
     
     # join all individual zoom level tiles together
-    # tile-join -e ./tiles/"$geolayer"_"$year" ./tiled-aggregated/"$geolayer"_*.mbtiles
+    # tile-join -e ./tiles/"$geolayer"_"$year" ./tiled-aggregated/"$geolayer"_"$year"_*.mbtiles
     tile-join -o ./tiles/"$geolayer"_"$year".mbtiles ./tiled-aggregated/"$geolayer"_"$year"_*.mbtiles
 fi
 
     # Upload directory to s3
     # aws s3 sync ./tiles/"$geolayer"_"$year" s3://"$bucket"/"$geolayer"_"$year" --content-encoding gzip --delete
-    # aws s3 sync ./tiles/ s3://geography-tiles
     
     echo "Done creating "$geolayer"_"$year" tileset."
 
