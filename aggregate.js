@@ -160,11 +160,11 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
     const properties_b = keyed_geojson[a_match[1]].properties;
     const area_a = turf.area(keyed_geojson[a_match[0]]);
     const area_b = turf.area(keyed_geojson[a_match[1]]);
-    console.log(area_a, area_b);
     const prop_a = properties_a.GEOID;
     const prop_b = properties_b.GEOID;
     const geo_division = properties_a.GEOID.slice(0, SLICE);
-    const larger_geoid = (prop_a > prop_b) ? properties_a.GEOID : properties_b.GEOID;
+    const larger_geoid = (area_a > area_b) ? properties_a.GEOID : properties_b.GEOID;
+    const larger_name = (area_a > area_b) ? properties_a.NAME : properties_b.NAME;
 
     const combined = turf.union(keyed_geojson[a_match[0]], keyed_geojson[a_match[1]]);
 
@@ -172,6 +172,7 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
     // AA property is a flag for aggregated area
     combined.properties = {
       GEOID: larger_geoid,
+      NAME: larger_name,
       AA: true
     };
 
@@ -258,11 +259,11 @@ function getRetained(geo) {
   else if (geo === 'place') {
     return {
       '3': .46,
-      '4': .48,
-      '5': .60,
-      '6': .70,
-      '7': .80,
-      '8': .90
+      '4': .47,
+      '5': .48,
+      '6': .50,
+      '7': .65,
+      '8': .80
     };
   }
   else if (geo === 'tract') {

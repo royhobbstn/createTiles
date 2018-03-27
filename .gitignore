@@ -61,5 +61,10 @@ downloads
 geojson
 tiles
 unzipped
+aggregated-geojson
+aggregated-cleaned
+merged-geojson
+tiled-aggregated
+
 
 combined.json
