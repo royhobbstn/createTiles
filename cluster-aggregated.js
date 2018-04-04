@@ -1,8 +1,14 @@
 const fs = require('fs');
 const turf = require('@turf/turf');
+const zlib = require('zlib');
+const AWS = require('aws-sdk');
+const s3 = new AWS.S3();
 const clustersKmeans = require('./modules/modKMeans.js');
 
+const GEO_METADATA_BUCKET = 'geo-metadata';
 const CLUSTER_SIZE = 200;
+const cluster_obj = {};
+const hulls = [];
 
 console.log(`geotype: ${process.argv[2]}`);
 console.log(`year: ${process.argv[3]}`);
@@ -122,10 +128,11 @@ console.log('filtered level 9');
 
   console.log('done clustering');
 
-  const cluster_obj = {};
+  const all_clusters = new Set();
 
   clustered.features.forEach(feature => {
     cluster_obj[feature.properties.GEOID] = `${obj.zoom}_${feature.properties.cluster}`;
+    all_clusters.add(`${obj.zoom}_${feature.properties.cluster}`);
   });
 
   const updated_features = obj.feature_array.map(feature => {
@@ -136,35 +143,46 @@ console.log('filtered level 9');
     return feature.geometry;
   });
 
-  // save feature collection
-  const clustered_geojson = { "type": "FeatureCollection", "features": updated_features };
-
-  fs.writeFile(`./cl_processed/clustered_${GEOTYPE}_${YEAR}_${obj.zoom}.json`, JSON.stringify(clustered_geojson), 'utf8', function(err) {
-
-    if (err) {
-      return console.log(err);
-    }
-    console.log(`saved at ./cl_processed/clustered_${GEOTYPE}_${YEAR}_${obj.zoom}.json`);
-  });
-
-
-  // TODO don't save these intermediate files above.  Turn into Hull for each cluster
-
-
-  // get list of all clusters in this file
 
   // for each cluster in the above list
+  all_clusters.forEach(cluster => {
+    const c_geojson = updated_features.filter(feat => {
+      return feat.properties.cluster === cluster;
+    });
+    const c_layer = turf.featureCollection(c_geojson);
+    const hull = turf.convex(c_layer);
+    hull.properties = { cluster };
 
-  // create layer for each cluster
+    hulls.push(hull);
+  });
 
-  // create hull for each layer
+});
 
-  // save hull into a cluster file on disk?  (in memory?)
+// save geoid-cluster lookup to s3
+const key = `clusters_${YEAR}_${GEOTYPE}.json`;
 
-  // combine all hull's into single geojson
+zlib.gzip(JSON.stringify(cluster_obj), function(error, result) {
+  if (error) throw error;
 
-  // Create tile layer
+  const params = { Bucket: GEO_METADATA_BUCKET, Key: key, Body: result, ContentType: 'application/json', ContentEncoding: 'gzip' };
+  s3.putObject(params, function(err, data) {
+    if (err) {
+      console.log(err);
+    }
+    else {
+      console.log(`Successfully uploaded data to ${key}`);
+    }
+  });
 
-  // Write file of which GEOIDs are in each cluster.  WAY above.  cluster_obj.
+});
 
+// combine all into feature collection
+const clustered_geojson = { "type": "FeatureCollection", "features": hulls };
+
+fs.writeFile(`./cl_processed/hulls_${GEOTYPE}_${YEAR}.json`, JSON.stringify(clustered_geojson), 'utf8', function(err) {
+
+  if (err) {
+    return console.log(err);
+  }
+  console.log(`saved at ./cl_processed/hulls_${GEOTYPE}_${YEAR}.json`);
 });

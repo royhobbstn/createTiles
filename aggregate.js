@@ -1,6 +1,6 @@
 const fs = require('fs');
 const geojsonRbush = require('geojson-rbush').default;
-const { computeFeature } = require('./computeFeature.js');
+const { computeFeature } = require('./modules/computeFeature.js');
 const present = require('present');
 const turf = require('@turf/turf');
 
