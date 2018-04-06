@@ -20,16 +20,15 @@ mkdir ./downloads ./geojson ./tiles ./cluster-tiles ./unzipped ./merged-geojson 
 
 numberargs=$#
 
-if [ $numberargs -lt 3 ] || [ $numberargs -gt 3 ] ; then 
-    echo "incorrect.  use format: bash geotiles_carto_2014-2016.sh bucketname geolayer year"
+if [ $numberargs -lt 2 ] || [ $numberargs -gt 2 ] ; then 
+    echo "incorrect.  use format: bash geotiles_carto_2014-2016.sh geolayer year"
     echo "where geolayer is one of: county, state, tract, bg, place"
     echo "where year is one of: 2014 2015 2016.  perhaps beyond."
     exit 1;
 fi
 
-bucket=$1
-geolayer=$2
-year=$3
+geolayer=$1
+year=$2
 
 echo "Creating "$geolayer"_"$year" tileset."
 
@@ -98,8 +97,8 @@ then
 fi
 
     # Upload directory to s3
-    aws s3 sync ./tiles/"$geolayer"_"$year" s3://"$bucket"/"$geolayer"_"$year" --content-encoding gzip --delete
-    aws s3 sync ./cluster-tiles/"$geolayer"_"$year" s3://"$bucket"_cl/"$geolayer"_"$year"_cl --content-encoding gzip --delete
+    aws s3 sync ./tiles/"$geolayer"_"$year" s3://v2-geography-tiles/"$geolayer"_"$year" --content-encoding gzip --delete
+    aws s3 sync ./cluster-tiles/"$geolayer"_"$year" s3://v2-cluster-tiles/"$geolayer"_"$year"_cl --content-encoding gzip --delete
 
     echo "Done creating "$geolayer"_"$year" tilesets."
 
