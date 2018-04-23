@@ -5,6 +5,7 @@ const AWS = require('aws-sdk');
 const s3 = new AWS.S3();
 const clustersKmeans = require('./modules/modKMeans.js');
 
+const GEO_BUCKET = 'v2-cluster-json';
 const GEO_METADATA_BUCKET = 'geo-metadata';
 const CLUSTER_SIZE = 200;
 const cluster_obj = {};
@@ -76,11 +77,22 @@ all_clusters.forEach(cluster => {
   hulls.push(hull);
 });
 
+// geoid_lookup better as { CLUSTER: [ARRAY OF GEOIDS] }.
+const cluster_array = {};
+
+Object.keys(cluster_obj).forEach(geoid => {
+  const cluster = cluster_obj[geoid];
+  if (!cluster_array[cluster]) {
+    cluster_array[cluster] = [];
+  }
+  cluster_array[cluster].push(geoid);
+});
+
 
 // save geoid-cluster lookup to s3
 const key = `clusters_${YEAR}_${GEOTYPE}.json`;
 
-zlib.gzip(JSON.stringify(cluster_obj), function(error, result) {
+zlib.gzip(JSON.stringify(cluster_array), function(error, result) {
   if (error) throw error;
 
   const params = { Bucket: GEO_METADATA_BUCKET, Key: key, Body: result, ContentType: 'application/json', ContentEncoding: 'gzip' };
@@ -89,19 +101,26 @@ zlib.gzip(JSON.stringify(cluster_obj), function(error, result) {
       console.log(err);
     }
     else {
-      console.log(`Successfully uploaded data to ${key}`);
+      console.log(`Successfully uploaded data to ${GEO_METADATA_BUCKET} ${key}`);
     }
   });
 
 });
 
-// combine all into feature collection
-const clustered_geojson = { "type": "FeatureCollection", "features": hulls };
+// save json to s3
+const jsonfile_key = `clusters_${YEAR}_${GEOTYPE}.json`;
 
-fs.writeFile(`./cl_processed/hulls_${GEOTYPE}_${YEAR}.json`, JSON.stringify(clustered_geojson), 'utf8', function(err) {
+zlib.gzip(JSON.stringify(hulls), function(error, result) {
+  if (error) throw error;
 
-  if (err) {
-    return console.log(err);
-  }
-  console.log(`saved at ./cl_processed/hulls_${GEOTYPE}_${YEAR}.json`);
+  const params = { Bucket: GEO_BUCKET, Key: jsonfile_key, Body: result, ContentType: 'application/json', ContentEncoding: 'gzip' };
+  s3.putObject(params, function(err, data) {
+    if (err) {
+      console.log(err);
+    }
+    else {
+      console.log(`Successfully uploaded data to ${GEO_BUCKET} ${key}`);
+    }
+  });
+
 });

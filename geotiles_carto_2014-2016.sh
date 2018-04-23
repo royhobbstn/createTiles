@@ -15,8 +15,8 @@ npm install -g mapshaper
 declare -a state_fips=('01' '02' '04' '05' '06' '08' '09' '10' '11' '12' '13' '15' '16' '17' '18' '19' '20' '21' '22' '23' '24' '25' '26' '27' '28' '29' '30' '31' '32' '33' '34' '35' '36' '37' '38' '39' '40' '41' '42' '44' '45' '46' '47' '48' '49' '50' '51' '53' '54' '55' '56' '60' '66' '69' '72' '78');
 
 # clean old (just in case) and create temporary directories
-rm -rf ./downloads ./geojson ./tiles ./cluster-tiles ./unzipped ./merged-geojson ./aggregated-geojson ./tiled-aggregated ./aggregated-geojson ./cl_processed
-mkdir ./downloads ./geojson ./tiles ./cluster-tiles ./unzipped ./merged-geojson ./aggregated-geojson ./tiled-aggregated ./aggregated-geojson ./mbtiles ./cl_processed
+rm -rf ./downloads ./geojson ./tiles ./cluster-tiles ./unzipped ./merged-geojson ./aggregated-geojson ./tiled-aggregated ./aggregated-geojson
+mkdir ./downloads ./geojson ./tiles ./cluster-tiles ./unzipped ./merged-geojson ./aggregated-geojson ./tiled-aggregated ./aggregated-geojson ./mbtiles
 
 numberargs=$#
 
@@ -42,14 +42,11 @@ then
     # cluster unique GEOIDs in each zoom level.
     node --max_old_space_size=8192 cluster-plain.js "$geolayer" "$year"
     
+    exit 1;
+    
     # create county or state tiles
     tippecanoe -e ./tiles/"$geolayer"_"$year" -l main -pt -ab -z9 -Z3 -y GEOID -y NAME ./geojson/cb_"$year"_us_"$geolayer"_500k.geojson
     tippecanoe -e ./mbtiles/"$geolayer"_"$year".mbtiles -l main -pt -ab -z9 -Z3 -y GEOID -y NAME ./geojson/cb_"$year"_us_"$geolayer"_500k.geojson
-    
-    # tippecanoe the hull cluster
-    tippecanoe -e ./cluster-tiles/"$geolayer"_"$year"_cl -l main -aL -D8 -z9 -Z3 ./cl_processed/*.json
-    tippecanoe -o ./mbtiles/"$geolayer"_"$year"_cl.mbtiles -l main -aL -D10 -z9 -Z3 ./cl_processed/*.json
-
 fi
 
 if [ "$geolayer" == "place" ] || [ "$geolayer" == "tract" ] || [ "$geolayer" == "bg" ] ;
@@ -87,10 +84,6 @@ then
     tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_8.mbtiles -l main -ab -pt -D10 -d10 -z8 -Z8 -y GEOID `echo $NM` -M 250000 ./aggregated-geojson/"$geolayer"_"$year"_8.json
     tippecanoe -o ./tiled-aggregated/"$geolayer"_"$year"_9.mbtiles -l main -ab -pt -z9 -Z9 -y GEOID `echo $NM` -M 250000 ./merged-geojson/"$geolayer"_"$year".json
     
-    # tippecanoe the hull-cluster_geojson
-    tippecanoe -e ./cluster-tiles/"$geolayer"_"$year"_cl -l main -aL -D10 -z9 -Z3 ./cl_processed/*.json
-    tippecanoe -o ./mbtiles/"$geolayer"_"$year"_cl.mbtiles -l main -aL -D10 -z9 -Z3 ./cl_processed/*.json
-    
     # join all individual zoom level tiles together
     tile-join -e ./tiles/"$geolayer"_"$year" ./tiled-aggregated/"$geolayer"_"$year"_*.mbtiles
     tile-join -o ./mbtiles/"$geolayer"_"$year".mbtiles ./tiled-aggregated/"$geolayer"_"$year"_*.mbtiles
@@ -98,10 +91,9 @@ fi
 
     # Upload directory to s3
     aws s3 sync ./tiles/"$geolayer"_"$year" s3://v2-geography-tiles/"$geolayer"_"$year" --content-encoding gzip --delete
-    aws s3 sync ./cluster-tiles/"$geolayer"_"$year" s3://v2-cluster-tiles/"$geolayer"_"$year"_cl --content-encoding gzip --delete
 
-    echo "Done creating "$geolayer"_"$year" tilesets."
+    echo "Done creating "$geolayer"_"$year" tileset."
 
     
 # clean up
-rm -rf ./downloads ./geojson ./tiles ./cluster-tiles ./unzipped ./merged-geojson ./aggregated-geojson ./tiled-aggregated ./aggregated-geojson ./cl_processed
+rm -rf ./downloads ./geojson ./tiles ./cluster-tiles ./unzipped ./merged-geojson ./aggregated-geojson ./tiled-aggregated ./aggregated-geojson
