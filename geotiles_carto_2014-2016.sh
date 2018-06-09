@@ -42,8 +42,6 @@ then
     # cluster unique GEOIDs in each zoom level.
     node --max_old_space_size=8192 cluster-plain.js "$geolayer" "$year"
     
-    exit 1;
-    
     # create county or state tiles
     tippecanoe -e ./tiles/"$geolayer"_"$year" -l main -pt -ab -z9 -Z3 -y GEOID -y NAME ./geojson/cb_"$year"_us_"$geolayer"_500k.geojson
     tippecanoe -e ./mbtiles/"$geolayer"_"$year".mbtiles -l main -pt -ab -z9 -Z3 -y GEOID -y NAME ./geojson/cb_"$year"_us_"$geolayer"_500k.geojson

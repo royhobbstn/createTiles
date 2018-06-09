@@ -5,6 +5,7 @@
   "main": "aggregate.js",
   "dependencies": {
     "@turf/turf": "^5.1.6",
+    "aws-sdk": "^2.254.1",
     "geojson-rbush": "^3.1.1",
     "present": "^1.0.0",
     "random-points-on-polygon": "^0.0.4",
