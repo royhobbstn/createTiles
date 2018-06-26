@@ -42,7 +42,7 @@ geojson_file.features.forEach((feature, index) => {
     console.log('index progress: ' + ((index / geojson_feature_count) * 100).toFixed(2) + '%');
   }
 
-  keyed_geojson[feature.properties.GEOID] = Object.assign({}, feature, { properties: { GEOID: feature.properties.GEOID } });
+  keyed_geojson[feature.properties.GEOID] = Object.assign({}, feature, { properties: { GEOID: feature.properties.GEOID, NAME: feature.properties.NAME } });
   computeFeature(feature, tree, ordered_obj, counter, SLICE);
 });
 
