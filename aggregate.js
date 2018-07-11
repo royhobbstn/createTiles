@@ -1,20 +1,25 @@
+// node --max_old_space_size=8192 aggregate.js bg 2016
+// (geo, year)
+
 const fs = require('fs');
 const geojsonRbush = require('geojson-rbush').default;
 const { computeFeature } = require('./modules/computeFeature.js');
 const present = require('present');
 const turf = require('@turf/turf');
 
-// node --max_old_space_size=8192 createIndex.js bg 2016
-// (geotype, year)
+// node --max_old_space_size=8192 aggregate.js bg 2016
+// (geotype, zoomlevel, year)
 
 console.log(`geotype: ${process.argv[2]}`);
 console.log(`year: ${process.argv[3]}`);
 
+
 if (!process.argv[2] || !process.argv[3]) {
   console.log('missing arguments: (geotype, year');
-  console.log('run like: node --max_old_space_size=8192 createIndex.js bg 2016');
+  console.log('run like: node --max_old_space_size=8192 aggregate.js bg 2016');
   process.exit();
 }
+
 
 const GEOTYPE = process.argv[2];
 const YEAR = process.argv[3];
@@ -52,22 +57,7 @@ geojson_file.features.forEach((feature, index) => {
 // without aggregating across state or county lines
 // note: this is beautiful
 
-
-
-const aa = present(); // tracks total execution time
-
-// node --max_old_space_size=8192 aggregate.js bg 2016
-// (geotype, zoomlevel, year)
-
-console.log(`geotype: ${process.argv[2]}`);
-console.log(`year: ${process.argv[3]}`);
-
-
-if (!process.argv[2] || !process.argv[3]) {
-  console.log('missing arguments: (geotype, year');
-  console.log('run like: node --max_old_space_size=8192 aggregate.js bg 2016');
-  process.exit();
-}
+const total_time = present(); // tracks total execution time
 
 const RETAINED = getRetained(GEOTYPE);
 
@@ -223,7 +213,7 @@ const geojson_array = Object.keys(keyed_geojson).map(feature => {
 // presumably the lowest zoom level doesn't get reached since the loop terminates just before the count hits the target
 // so it is saved here, at the end of the program.
 fs.writeFileSync(`./aggregated-geojson/${GEOTYPE}_${YEAR}_${LOW_ZOOM}.json`, JSON.stringify(turf.featureCollection(geojson_array)), 'utf8');
-console.log(present() - aa);
+console.log(present() - total_time);
 
 
 /*** Functions ***/

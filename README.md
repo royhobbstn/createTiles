@@ -4,7 +4,7 @@ Automate creation of Census [cartographic boundary file](https://www.census.gov/
 
 The created tilesets are purposefully incomplete at zoom levels less than 9 (for tract, bg and place) to cut down on the displayed number of vertices (and thereby improve performance).  To accomplish this, an algorithm combining small features into larger has been implemented which respects logical geographic boundaries (so that features are not combined across County or State boundaries).
 
-Additionally, features in each tile zoom level are assigned to geographic k-means clusters.  Map panning and zooming queries the geojson cluster layer instead of rendered features (as the tradition approach using queryRenderedFeatures would do).  The benefit of this is being able to pre-emptively load data without waiting for the base tiles to render first.  It also will also gather information for features outside the view area, so panning or zooming doesnt result in a temporary flash of blank features.
+Additionally, features in each tile zoom level are assigned to geographic k-means clusters.  Map panning and zooming queries the geojson cluster layer instead of rendered features (as the traditional approach using queryRenderedFeatures would do).  The benefit of this is being able to pre-emptively load data without waiting for the base tiles to render first.  It also will also gather information for features outside the view area, so panning or zooming doesnt result in a temporary flash of blank features.
 
 **Supported Geographies:**
 

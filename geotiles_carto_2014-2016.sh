@@ -7,7 +7,7 @@
 brew install tippecanoe
 brew upgrade tippecanoe
 
-# install the npm shapefile and mapshaper packages
+# install the npm shapefile and mapshaper cli packages
 npm install -g shapefile
 npm install -g mapshaper
 
