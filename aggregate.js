@@ -1,5 +1,6 @@
 // node --max_old_space_size=8192 aggregate.js bg 2016
-// (geo, year)
+// (geotype, zoomlevel, year)
+// required: nodeJS 8+ for util.promisify
 
 const fs = require('fs');
 const geojsonRbush = require('geojson-rbush').default;
@@ -7,27 +8,39 @@ const { computeFeature } = require('./modules/computeFeature.js');
 const present = require('present');
 const turf = require('@turf/turf');
 
-// node --max_old_space_size=8192 aggregate.js bg 2016
-// (geotype, zoomlevel, year)
-
-console.log(`geotype: ${process.argv[2]}`);
-console.log(`year: ${process.argv[3]}`);
+const { promisify } = require('util');
+const writeFileAsync = promisify(fs.writeFile);
 
 
-if (!process.argv[2] || !process.argv[3]) {
-  console.log('missing arguments: (geotype, year');
-  console.log('run like: node --max_old_space_size=8192 aggregate.js bg 2016');
-  process.exit();
+// to run as test with smaller dataset: node aggregate.js test
+const is_test = process.argv[2] === 'test';
+
+if (!is_test) {
+
+  console.log(`geotype: ${process.argv[2]}`);
+  console.log(`year: ${process.argv[3]}`);
+
+
+  if (!process.argv[2] || !process.argv[3]) {
+    console.log('missing arguments: (geotype, year');
+    console.log('run like: node --max_old_space_size=8192 aggregate.js bg 2016');
+    process.exit();
+  }
+
 }
 
+const GEOTYPE = is_test ? 'bg' : process.argv[2];
+const YEAR = is_test ? '2017' : process.argv[3];
 
-const GEOTYPE = process.argv[2];
-const YEAR = process.argv[3];
+const INPUT_DIR = is_test ? 'test_input' : 'merged-geojson';
+const OUTPUT_DIR = is_test ? 'test_output' : 'aggregated-geojson';
+
 const SLICE = getGeoidSlice(GEOTYPE);
 
-const geojson_file = require(`./merged-geojson/${GEOTYPE}_${YEAR}.json`);
+const geojson_file = require(`./${INPUT_DIR}/${GEOTYPE}_${YEAR}.json`);
+
 let geojson_feature_count = geojson_file.features.length;
-console.log(geojson_feature_count);
+console.log(`Features in dataset: ${geojson_feature_count}`);
 
 
 /*** Mutable Globals ***/
@@ -36,6 +49,7 @@ const ordered_obj = {};
 const keyed_geojson = {};
 let counter = 0;
 const threshold = [];
+const written_file_promises = [];
 
 /*** Initial index creation and calculation ***/
 
@@ -92,7 +106,7 @@ while ((geojson_feature_count > DESIRED_NUMBER_FEATURES) && can_still_simplify) 
         return keyed_geojson[feature];
       });
       console.log('writing zoomlevel: ' + obj.zoom);
-      fs.writeFileSync(`./aggregated-geojson/${GEOTYPE}_${YEAR}_${obj.zoom}.json`, JSON.stringify(turf.featureCollection(geojson_array)), 'utf8');
+      written_file_promises.push(writeFileAsync(`./${OUTPUT_DIR}/${GEOTYPE}_${YEAR}_${obj.zoom}.json`, JSON.stringify(turf.featureCollection(geojson_array)), 'utf8'));
     }
   });
 
@@ -212,29 +226,42 @@ const geojson_array = Object.keys(keyed_geojson).map(feature => {
 
 // presumably the lowest zoom level doesn't get reached since the loop terminates just before the count hits the target
 // so it is saved here, at the end of the program.
-fs.writeFileSync(`./aggregated-geojson/${GEOTYPE}_${YEAR}_${LOW_ZOOM}.json`, JSON.stringify(turf.featureCollection(geojson_array)), 'utf8');
-console.log(present() - total_time);
+written_file_promises.push(writeFileAsync(`./${OUTPUT_DIR}/${GEOTYPE}_${YEAR}_${LOW_ZOOM}.json`, JSON.stringify(turf.featureCollection(geojson_array)), 'utf8'));
 
+
+Promise.all(written_file_promises).then(() => {
+    // end of program
+    console.log('Completed.');
+    console.log(present() - total_time);
+  })
+  .catch(err => {
+    // error writing file(s).  stop immediately
+    console.log(err);
+    process.exit();
+  });
 
 /*** Functions ***/
 
 
 // set limit on which geo level a geography can simplify up to
+// in a Census GEOID, the first two digits corresponds to state fips
+// while the next 3 (in tract and bg geo levels) correspond to county
 function getGeoidSlice(geo) {
   if (geo === "bg") {
-    return 5;
+    return 5; // county level  
   }
   else if (geo === "tract") {
     return 5;
   }
   else if (geo === "place") {
-    return 2;
+    return 2; // state level
   }
   else {
     console.log('unknown geo: ' + geo);
   }
 }
 
+// percent of features that will be retained at each zoom level, by geo
 function getRetained(geo) {
   if (geo === 'bg') {
     return {
